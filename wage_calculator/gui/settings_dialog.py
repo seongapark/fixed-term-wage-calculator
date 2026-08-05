@@ -99,28 +99,71 @@ class SettingsDialog(tk.Toplevel):
         self.config_obj.delete_survey(name)
         self._reload_surveys()
 
-    # ---------------- 공통 입력값 ----------------
+    # ---------------- 연도별 요율 관리 ----------------
     def _build_common_tab(self):
         frame = self.common_tab
-        ttk.Label(frame, text="시급환산 (원)").grid(row=0, column=0, sticky="w", padx=8, pady=8)
-        self.hourly_var = tk.StringVar(value=str(self.config_obj.hourly_wage))
-        ttk.Entry(frame, textvariable=self.hourly_var, width=15).grid(row=0, column=1, padx=8)
+        self.rate_list = ttk.Treeview(frame, columns=("year", "hourly", "meal"), show="headings", height=10)
+        for c, label in [("year", "연도"), ("hourly", "시급환산(원)"), ("meal", "월 식대(원)")]:
+            self.rate_list.heading(c, text=label)
+            self.rate_list.column(c, width=140)
+        self.rate_list.pack(fill="both", expand=True, padx=8, pady=8)
+        self._reload_rates()
 
-        ttk.Label(frame, text="월 식대 (원)").grid(row=1, column=0, sticky="w", padx=8, pady=8)
-        self.meal_var = tk.StringVar(value=str(self.config_obj.meal_allowance))
-        ttk.Entry(frame, textvariable=self.meal_var, width=15).grid(row=1, column=1, padx=8)
+        form = ttk.Frame(frame)
+        form.pack(fill="x", padx=8)
+        ttk.Label(form, text="연도").grid(row=0, column=0)
+        ttk.Label(form, text="시급환산(원)").grid(row=0, column=1)
+        ttk.Label(form, text="월 식대(원)").grid(row=0, column=2)
+        self.rate_year_var = tk.StringVar()
+        self.rate_hourly_var = tk.StringVar()
+        self.rate_meal_var = tk.StringVar()
+        ttk.Entry(form, textvariable=self.rate_year_var, width=10).grid(row=1, column=0, padx=2)
+        ttk.Entry(form, textvariable=self.rate_hourly_var, width=14).grid(row=1, column=1, padx=2)
+        ttk.Entry(form, textvariable=self.rate_meal_var, width=14).grid(row=1, column=2, padx=2)
 
-        ttk.Button(frame, text="저장", command=self._save_common).grid(row=2, column=0, columnspan=2, pady=12)
+        btns = ttk.Frame(frame)
+        btns.pack(fill="x", padx=8, pady=6)
+        ttk.Button(btns, text="추가/수정", command=self._add_or_update_rate).pack(side="left")
+        ttk.Button(btns, text="선택 삭제", command=self._delete_rate).pack(side="left", padx=6)
+        self.rate_list.bind("<<TreeviewSelect>>", self._on_rate_select)
 
-    def _save_common(self):
-        try:
-            self.config_obj.hourly_wage = int(self.hourly_var.get())
-            self.config_obj.meal_allowance = int(self.meal_var.get())
-        except ValueError:
-            messagebox.showerror("형식 오류", "숫자만 입력하세요.")
+    def _reload_rates(self):
+        for i in self.rate_list.get_children():
+            self.rate_list.delete(i)
+        for year in self.config_obj.rate_years():
+            self.rate_list.insert("", "end", values=(
+                year, self.config_obj.hourly_wage_for(year), self.config_obj.meal_allowance_for(year),
+            ))
+
+    def _on_rate_select(self, _evt=None):
+        sel = self.rate_list.selection()
+        if not sel:
             return
+        year, hourly, meal = self.rate_list.item(sel[0], "values")
+        self.rate_year_var.set(year)
+        self.rate_hourly_var.set(hourly)
+        self.rate_meal_var.set(meal)
+
+    def _add_or_update_rate(self):
+        try:
+            year = int(self.rate_year_var.get())
+            hourly = int(self.rate_hourly_var.get())
+            meal = int(self.rate_meal_var.get())
+        except ValueError:
+            messagebox.showerror("형식 오류", "연도/시급/식대는 모두 숫자로 입력하세요.")
+            return
+        self.config_obj.set_year_rates(year, hourly, meal)
         self.config_obj.save()
-        messagebox.showinfo("저장 완료", "공통 입력값이 저장되었습니다.")
+        self._reload_rates()
+
+    def _delete_rate(self):
+        sel = self.rate_list.selection()
+        if not sel:
+            return
+        year = int(self.rate_list.item(sel[0], "values")[0])
+        self.config_obj.delete_year_rates(year)
+        self.config_obj.save()
+        self._reload_rates()
 
     # ---------------- 공휴일 관리 ----------------
     def _build_holiday_tab(self):
