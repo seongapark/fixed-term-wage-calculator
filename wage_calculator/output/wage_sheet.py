@@ -7,7 +7,7 @@ SHEET_NAME = "임금내역(월중)"
 HEADER_ROWS = 3
 DATA_START_ROW = HEADER_ROWS + 1
 
-# 컬럼 순서(원본 '임금내역(월중)' 시트와 동일): 1~29열
+# 컬럼 순서(원본 '임금내역(월중)' 시트와 동일): 1~31열
 COL = {
     "seq": 1, "name": 2, "survey": 3, "period_start": 4, "period_end": 5,
     "daily_wage": 6, "actual_workdays": 7, "public_leave": 8, "paid_holiday": 9,
@@ -16,7 +16,7 @@ COL = {
     "gross_pay": 17, "late_out_deduction": 18, "base_pay": 19, "weekly_holiday_pay": 20,
     "meal_allowance": 21, "leave_compensation": 22, "total_payment": 23,
     "ssn": 24, "contract_start": 25, "contract_end": 26, "bank": 27, "account": 28,
-    "note": 29,
+    "note": 29, "retro_adjustment": 30, "final_payment": 31,
 }
 
 
@@ -65,8 +65,10 @@ def _write_headers(ws):
     _set(ws, "AA1", "거래\n은행", "AA1:AA3")
     _set(ws, "AB1", "계 좌 번  호", "AB1:AB3")
     _set(ws, "AC1", "비고", "AC1:AC3")
+    _set(ws, "AD1", "소급\n조정액", "AD1:AD3")
+    _set(ws, "AE1", "최종\n지급액", "AE1:AE3")
 
-    for col in range(1, 30):
+    for col in range(1, 32):
         from openpyxl.utils import get_column_letter
         ws.column_dimensions[get_column_letter(col)].width = 10
 
@@ -86,7 +88,10 @@ def _num(v):
     return v
 
 
-def build_wage_sheet(wb, results, seq_start=1):
+def build_wage_sheet(wb, results, seq_start=1, retro_adjustments=None):
+    from core.parser import person_key
+
+    retro_adjustments = retro_adjustments or {}
     ws = wb.create_sheet(SHEET_NAME)
     _write_headers(ws)
 
@@ -121,6 +126,9 @@ def build_wage_sheet(wb, results, seq_start=1):
         ws.cell(row=row, column=COL["bank"], value=r.bank)
         ws.cell(row=row, column=COL["account"], value=r.account)
         ws.cell(row=row, column=COL["note"], value=r.special_leave_note)
+        adjustment = retro_adjustments.get(person_key(r.name, r.birth), 0)
+        ws.cell(row=row, column=COL["retro_adjustment"], value=adjustment)
+        ws.cell(row=row, column=COL["final_payment"], value=r.total_payment + adjustment)
         row += 1
 
     for col in (COL["period_start"], COL["period_end"], COL["contract_start"], COL["contract_end"]):
