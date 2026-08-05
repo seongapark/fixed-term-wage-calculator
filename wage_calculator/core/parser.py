@@ -158,34 +158,36 @@ def build_target_people(giganje_rows, employees: dict):
         person.dept = str(row.get("소속") or "") or person.dept
         person.rank = str(row.get("직급") or "") or person.rank
 
-        raw_category = row.get("종별")
-        date_field = row.get("사용기간(날짜)")
-        if raw_category is None or str(raw_category).strip() == "" or date_field is None:
-            continue  # 사용 내역 없음(만근) 행
-        raw_category = str(raw_category).strip()
-
-        time_field = row.get("사용시간(시분)")
-        time_range = date_utils.parse_time_range(time_field)
-        start_d, end_d = date_utils.parse_date_range(date_field)
-
-        if time_range is not None:
-            # 시간 기재분: 단일 날짜에만 적용(사양상 다일+시간 조합은 발생하지 않음)
-            t_start, t_end = time_range
-            minutes = date_utils.deduct_minutes(t_start, t_end)
-            person.events.append(
-                build_event(raw_category, start_d, t_start, t_end, minutes)
-            )
-        else:
-            # 종일 항목의 다일(多日) 사용기간은 근무일(월~금)만 하루로 집계.
-            # 토/일이 기간 중간에 끼어도 원래 근무의무가 없던 날이라 공가/결근 등으로
-            # 잡히면 실출근(NETWORKDAYS 기준) 계산과 불일치가 생기므로 주말은 제외.
-            # source_range=(start_d, end_d): 원본 행 전체 기간을 넘겨서, 같은 행에서
-            # 펼쳐진 이벤트들이 나중에(특별휴가 마킹 화면 등에서) 한 그룹으로 묶이게 함.
-            for d in date_utils.daterange(start_d, end_d):
-                if d.weekday() < 5:
-                    person.events.append(build_event(raw_category, d, source_range=(start_d, end_d)))
+        person.events.extend(events_from_row(row))
 
     return people, missing_names, ambiguous_names
+
+
+def events_from_row(row) -> list:
+    """B파일 원본 행 1개(dict)를 LeaveEvent 리스트로 변환. 사용 내역이 없는
+    (만근) 행이면 빈 리스트. build_target_people()의 매칭 로직과 분리해 두면,
+    소급계산(완전퇴사자)처럼 로스터 밖의 임시 인물에게도 같은 파싱 규칙을
+    재사용할 수 있다."""
+    raw_category = row.get("종별")
+    date_field = row.get("사용기간(날짜)")
+    if raw_category is None or str(raw_category).strip() == "" or date_field is None:
+        return []
+    raw_category = str(raw_category).strip()
+
+    time_field = row.get("사용시간(시분)")
+    time_range = date_utils.parse_time_range(time_field)
+    start_d, end_d = date_utils.parse_date_range(date_field)
+
+    events = []
+    if time_range is not None:
+        t_start, t_end = time_range
+        minutes = date_utils.deduct_minutes(t_start, t_end)
+        events.append(build_event(raw_category, start_d, t_start, t_end, minutes))
+    else:
+        for d in date_utils.daterange(start_d, end_d):
+            if d.weekday() < 5:
+                events.append(build_event(raw_category, d, source_range=(start_d, end_d)))
+    return events
 
 
 def load_previous_payroll(path) -> dict:
