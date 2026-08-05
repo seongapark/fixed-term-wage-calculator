@@ -44,6 +44,8 @@ class PayrollResult:
     weekly_windows: list = field(default_factory=list)
     monthly_windows: list = field(default_factory=list)
     late_out_events: list = field(default_factory=list)
+    special_leave_events: list = field(default_factory=list)
+    special_leave_note: str = ""
 
 
 def compute_pay_period(contract_start: date, contract_end: date, year: int, month: int):
@@ -64,15 +66,16 @@ def calc_payroll(person, config, year: int, month: int) -> PayrollResult:
 
     period_events = [e for e in person.events if period_start <= e.d <= period_end]
 
-    public_leave_days = sum(e.day_weight for e in period_events if e.classified == "공가")
-    absence_days = sum(e.day_weight for e in period_events if e.classified == "결근")
+    public_leave_days = sum(e.day_weight for e in period_events if e.classified in ("공가", "유급특별휴가"))
+    absence_days = sum(e.day_weight for e in period_events if e.classified in ("결근", "무급특별휴가"))
+    special_leave_events = [e for e in period_events if e.classified in ("유급특별휴가", "무급특별휴가")]
 
     holidays = config.holidays_in_range(period_start.isoformat(), period_end.isoformat())
     paid_holiday_days = len(holidays)
 
     workdays = date_utils.networkdays(period_start, period_end)
     actual_workdays = workdays - public_leave_days - (paid_holiday_days + absence_days)
-    total_days = actual_workdays + paid_holiday_days + absence_days
+    total_days = actual_workdays + paid_holiday_days + public_leave_days
 
     late_out_events = [e for e in period_events if e.is_time_based]
     late_out_minutes = sum(e.minutes for e in late_out_events)
@@ -119,7 +122,33 @@ def calc_payroll(person, config, year: int, month: int) -> PayrollResult:
         leave_compensation=leave_compensation, total_payment=total_payment,
         weekly_windows=weekly_windows, monthly_windows=monthly_windows,
         late_out_events=late_out_events,
+        special_leave_events=special_leave_events,
+        special_leave_note=_format_special_leave_note(special_leave_events),
     )
+
+
+def _format_special_leave_note(events) -> str:
+    """특별휴가 이벤트 목록을 (유급/무급 구분 + 날짜) 비고 텍스트로 요약.
+    같은 원본 행(source_range)에서 나온 이벤트는 한 항목으로 묶는다."""
+    groups = {}
+    order = []
+    for e in events:
+        key = (e.classified, e.source_range)
+        if key not in groups:
+            groups[key] = []
+            order.append(key)
+        groups[key].append(e.d)
+    parts = []
+    for classified, source_range in order:
+        label = "유급" if classified == "유급특별휴가" else "무급"
+        dates = sorted(groups[(classified, source_range)])
+        start, end = dates[0], dates[-1]
+        if start == end:
+            date_text = f"{start.month}/{start.day}"
+        else:
+            date_text = f"{start.month}/{start.day}~{end.month}/{end.day}"
+        parts.append(f"특별휴가({label}) {date_text}")
+    return ", ".join(parts)
 
 
 def daily_meal_allowance(config, meal_eligible_days, calendar_month_days):
