@@ -51,7 +51,12 @@ def load_employees(path) -> dict:
 
 
 def load_giganje_rows(path) -> list:
-    """B파일(근무상황) 로드 후 직급에 '기간제'가 포함된 행만 반환(원본 dict 리스트)."""
+    """B파일(근무상황) 로드(원본 dict 리스트).
+
+    직급으로 거르지 않는다 - A파일(개인정보)이 이미 급여계산 대상자만
+    추려서 관리되므로, build_target_people()에서 이름+생년월일로 A파일과
+    매칭되는 행만 자연스럽게 급여 계산에 반영된다.
+    """
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb.worksheets[0]
     headers = _header_index(ws)
@@ -65,9 +70,6 @@ def load_giganje_rows(path) -> list:
         row = _row_dict(ws, r, headers)
         name = row.get("성명")
         if name is None or str(name).strip() == "":
-            continue
-        rank = str(row.get("직급") or "")
-        if "기간제" not in rank:
             continue
         row["성명"] = str(name).strip()
         rows.append(row)
