@@ -69,15 +69,10 @@ class App(tk.Tk):
         )
 
     def after_upload(self):
-        if collect_pending_groups(self.people):
-            self.show_special_leave_screen()
-        else:
-            self.show_target_screen()
-
-    def show_special_leave_screen(self):
-        self._set_screen(SpecialLeaveScreen(self.container, self))
-
-    def show_target_screen(self):
+        # A파일 데이터 문제(누락/동명이인)는 업로드 직후 바로 알려야 한다.
+        # 특별휴가 마킹 화면으로 먼저 라우팅되면, 사용자가 건별 유급/무급을
+        # 전부 클릭한 뒤에야 "A파일 다시 올리세요"를 보게 되는 낭비가 생기므로
+        # 이 체크는 특별휴가 라우팅 분기보다 먼저 실행한다.
         if self.missing_names:
             messagebox.showerror(
                 "대상자 확인 필요",
@@ -94,6 +89,15 @@ class App(tk.Tk):
                 + "\n\nA파일에 '생년월일' 컬럼을 추가하고 각 동명이인의 생년월일을 "
                   "정확히 입력한 뒤 다시 업로드해야 임금 산정을 진행할 수 있습니다.",
             )
+        if collect_pending_groups(self.people):
+            self.show_special_leave_screen()
+        else:
+            self.show_target_screen()
+
+    def show_special_leave_screen(self):
+        self._set_screen(SpecialLeaveScreen(self.container, self))
+
+    def show_target_screen(self):
         self._set_screen(TargetScreen(self.container, self))
 
     def reset(self):
