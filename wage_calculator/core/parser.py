@@ -3,6 +3,7 @@ import openpyxl
 
 from . import date_utils
 from .models import Employee, TargetPerson, build_event
+from output.wage_sheet import COL, SHEET_NAME, DATA_START_ROW
 
 
 def _header_index(ws):
@@ -185,3 +186,34 @@ def build_target_people(giganje_rows, employees: dict):
                     person.events.append(build_event(raw_category, d, source_range=(start_d, end_d)))
 
     return people, missing_names, ambiguous_names
+
+
+def load_previous_payroll(path) -> dict:
+    """이 프로그램이 직전에 생성한 임금내역(월중) 엑셀을 다시 읽어, 소급계산에
+    필요한 전월 정보를 주민번호를 키로 돌려준다. 이 파일은 프로그램이 직접
+    만든 것이라 헤더 텍스트가 아니라 output/wage_sheet.py의 COL과 동일한
+    고정 열 위치로 읽는다(헤더가 병합 셀이라 텍스트 파싱이 불안정함)."""
+    wb = openpyxl.load_workbook(path, data_only=True)
+    if SHEET_NAME not in wb.sheetnames:
+        raise ValueError(f"전월 임금내역 파일에 '{SHEET_NAME}' 시트가 없습니다.")
+    ws = wb[SHEET_NAME]
+
+    result = {}
+    for r in range(DATA_START_ROW, ws.max_row + 1):
+        name = ws.cell(row=r, column=COL["name"]).value
+        ssn = ws.cell(row=r, column=COL["ssn"]).value
+        if name is None or str(name).strip() == "" or ssn is None or str(ssn).strip() == "":
+            continue
+        ssn = str(ssn).strip()
+        contract_start = ws.cell(row=r, column=COL["contract_start"]).value
+        contract_end = ws.cell(row=r, column=COL["contract_end"]).value
+        result[ssn] = {
+            "ssn": ssn,
+            "name": str(name).strip(),
+            "contract_start": date_utils.parse_date(contract_start) if contract_start else None,
+            "contract_end": date_utils.parse_date(contract_end) if contract_end else None,
+            "total_payment": ws.cell(row=r, column=COL["total_payment"]).value or 0,
+            "bank": ws.cell(row=r, column=COL["bank"]).value or "",
+            "account": ws.cell(row=r, column=COL["account"]).value or "",
+        }
+    return result
