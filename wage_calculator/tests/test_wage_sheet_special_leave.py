@@ -28,7 +28,7 @@ def test_note_column_and_header_comments():
         contract_start=date(2026, 7, 1), contract_end=date(2026, 7, 31), events=events,
         name="테스트", birth="", ssn="", bank="", account="", survey_name="테스트조사",
     )
-    config = Config({"surveys": [], "common": {"hourly_wage": 9820, "meal_allowance": 160000}, "holidays": []})
+    config = Config({"surveys": [], "rates": {"2026": {"hourly_wage": 9820, "meal_allowance": 160000}}, "holidays": []})
     result = calc_payroll(person, config, 2026, 7)
 
     wb = openpyxl.Workbook()

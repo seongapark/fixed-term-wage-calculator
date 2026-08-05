@@ -29,8 +29,7 @@ def main():
     survey = config.get_survey("테스트조사")
     contract_start = date.fromisoformat(survey["start"])
     contract_end = date.fromisoformat(survey["end"])
-    config.hourly_wage = 9820
-    config.meal_allowance = 160000
+    config.set_year_rates(2026, 9820, 160000)
 
     for name, person in people.items():
         person.survey_name = "테스트조사"

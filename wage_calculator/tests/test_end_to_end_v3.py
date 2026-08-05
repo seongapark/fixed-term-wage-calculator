@@ -47,7 +47,7 @@ def test_full_pipeline_with_special_leave():
     assert collect_pending_groups(people) == []
 
     # 4) 급여 계산
-    config = Config({"surveys": [], "common": {"hourly_wage": 9820, "meal_allowance": 160000}, "holidays": []})
+    config = Config({"surveys": [], "rates": {"2026": {"hourly_wage": 9820, "meal_allowance": 160000}}, "holidays": []})
     result = calc_payroll(person, config, 2026, 7)
 
     # workdays(2026-07-01~07-31) = 23
