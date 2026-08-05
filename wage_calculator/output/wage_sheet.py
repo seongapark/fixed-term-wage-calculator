@@ -1,4 +1,5 @@
 """7-0: '임금내역(월중)' 시트 재현(열 구성/헤더/순서를 원본과 동일하게, 값은 계산 결과)."""
+from openpyxl.comments import Comment
 from openpyxl.styles import Alignment, Font
 
 SHEET_NAME = "임금내역(월중)"
@@ -69,6 +70,15 @@ def _write_headers(ws):
         from openpyxl.utils import get_column_letter
         ws.column_dimensions[get_column_letter(col)].width = 10
 
+    ws["H3"].comment = Comment(
+        "공가(일)에는 유급 특별휴가 일수가 합산되어 있습니다. 세부 날짜는 비고란 참고.",
+        "임금계산 프로그램",
+    )
+    ws["J3"].comment = Comment(
+        "(결근)에는 무급 특별휴가 일수가 합산되어 있습니다. 세부 날짜는 비고란 참고.",
+        "임금계산 프로그램",
+    )
+
 
 def _num(v):
     if isinstance(v, float) and v.is_integer():
@@ -110,7 +120,7 @@ def build_wage_sheet(wb, results, seq_start=1):
         ws.cell(row=row, column=COL["contract_end"], value=r.contract_end)
         ws.cell(row=row, column=COL["bank"], value=r.bank)
         ws.cell(row=row, column=COL["account"], value=r.account)
-        ws.cell(row=row, column=COL["note"], value="")
+        ws.cell(row=row, column=COL["note"], value=r.special_leave_note)
         row += 1
 
     for col in (COL["period_start"], COL["period_end"], COL["contract_start"], COL["contract_end"]):
