@@ -6,6 +6,33 @@ from tkinter import ttk
 from core import date_utils
 
 
+class ContractPeriodCheckDialog(tk.Toplevel):
+    """6장-3 앞단: 기존 ConfirmRunDialog보다 먼저 떠서, 중도퇴사자·추가입사자의
+    계약기간을 담당자가 직접 다시 확인하도록 유도하는 확인창."""
+
+    def __init__(self, master, app):
+        super().__init__(master)
+        self.app = app
+        self.title("계약기간 확인")
+        self.geometry("420x180")
+        self.grab_set()
+
+        msg = (
+            "중도퇴사자와 추가입사자의 계약기간을 정확히 입력했는지 확인하세요.\n\n"
+            "계약기간이 틀리면 급여계산기간과 주휴/연차 판정이 모두 잘못 나옵니다."
+        )
+        ttk.Label(self, text=msg, wraplength=380, justify="left").pack(padx=16, pady=16)
+
+        btns = ttk.Frame(self)
+        btns.pack(pady=8)
+        ttk.Button(btns, text="아니오(다시입력)", command=self.destroy).pack(side="left", padx=8)
+        ttk.Button(btns, text="네(진행)", command=self._proceed).pack(side="left", padx=8)
+
+    def _proceed(self):
+        self.destroy()
+        self.app.open_confirm_dialog()
+
+
 class ConfirmRunDialog(tk.Toplevel):
     def __init__(self, master, app):
         super().__init__(master)

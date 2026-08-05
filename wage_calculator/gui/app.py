@@ -4,7 +4,7 @@ from tkinter import messagebox, ttk
 from core.config import Config
 from core.parser import build_target_people, load_employees, load_giganje_rows
 from core.payroll import calc_payroll
-from gui.confirm_dialog import ConfirmRunDialog
+from gui.confirm_dialog import ConfirmRunDialog, ContractPeriodCheckDialog
 from gui.evidence_screen import EvidenceScreen
 from gui.result_screen import ResultScreen
 from gui.settings_dialog import SettingsDialog
@@ -118,6 +118,9 @@ class App(tk.Tk):
         self.work_month = None
         self.results = []
         self.show_upload_screen()
+
+    def open_contract_period_check_dialog(self):
+        ContractPeriodCheckDialog(self, self)
 
     def open_confirm_dialog(self):
         ConfirmRunDialog(self, self)

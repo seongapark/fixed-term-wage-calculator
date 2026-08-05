@@ -186,4 +186,4 @@ class TargetScreen(ttk.Frame):
 
         self.app.work_year = year
         self.app.work_month = month
-        self.app.open_confirm_dialog()
+        self.app.open_contract_period_check_dialog()
