@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='통계조사관임금계산_v2.2',
+    name='통계조사관임금계산_v3.0',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
