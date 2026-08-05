@@ -61,8 +61,8 @@ def calc_payroll(person, config, year: int, month: int) -> PayrollResult:
     contract_end = person.contract_end
     period_start, period_end, month_last = compute_pay_period(contract_start, contract_end, year, month)
 
-    daily_wage = round_down(config.hourly_wage * 8, 1)
-    daily_meal = round_down(config.meal_allowance / 209 * 8, 1)
+    daily_wage = round_down(config.hourly_wage_for(year) * 8, 1)
+    daily_meal = round_down(config.meal_allowance_for(year) / 209 * 8, 1)
 
     period_events = [e for e in person.events if period_start <= e.d <= period_end]
 
@@ -98,10 +98,10 @@ def calc_payroll(person, config, year: int, month: int) -> PayrollResult:
     # late_out_minutes(분단위)는 내부적으로 그대로 유지해 공제액을 분단위로 정확히
     # 계산한다(시간 단위 반올림 금지). 임금내역 "조퇴외출(시간)" 컬럼에는 가독성을
     # 위해 output/wage_sheet.py에서 시간(소수) 단위로 환산해 표시한다.
-    late_out_deduction = round_down((config.hourly_wage / 60) * late_out_minutes, 10)
+    late_out_deduction = round_down((config.hourly_wage_for(year) / 60) * late_out_minutes, 10)
     base_pay = round_down(gross_pay - late_out_deduction, 10)
     weekly_holiday_pay = daily_wage * weekly_holiday_days
-    meal_allowance = round_down(daily_meal_allowance(config, meal_eligible_days, calendar_month_days), 10)
+    meal_allowance = round_down(daily_meal_allowance(config, year, meal_eligible_days, calendar_month_days), 10)
     leave_compensation = round_down((daily_wage + daily_meal) * remaining_leave_days, 1) if is_final_month else 0
     total_payment = round_down(base_pay + weekly_holiday_pay + meal_allowance + leave_compensation, 10)
 
@@ -162,5 +162,5 @@ def _format_special_leave_note(events) -> str:
     return ", ".join(parts)
 
 
-def daily_meal_allowance(config, meal_eligible_days, calendar_month_days):
-    return config.meal_allowance * meal_eligible_days / calendar_month_days
+def daily_meal_allowance(config, year, meal_eligible_days, calendar_month_days):
+    return config.meal_allowance_for(year) * meal_eligible_days / calendar_month_days
