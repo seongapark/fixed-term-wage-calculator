@@ -95,3 +95,35 @@ def add_months(d: date, months: int) -> date:
 def month_calendar_days(d: date) -> int:
     import calendar
     return calendar.monthrange(d.year, d.month)[1]
+
+
+_CENTURY_BY_GENDER_DIGIT = {
+    "1": 1900, "2": 1900, "5": 1900, "6": 1900,
+    "3": 2000, "4": 2000, "7": 2000, "8": 2000,
+    "9": 1800, "0": 1800,
+}
+
+
+def birth_from_ssn(ssn: str) -> str:
+    """주민등록번호 앞 7자리로 생년월일(YYYY-MM-DD)을 역산한다.
+
+    B파일(근무상황)에는 생년월일만 있고 주민번호가 없어, 전월 임금내역
+    파일(주민번호만 있음)의 사람을 당월 B파일과 매칭할 때(소급계산의
+    완전퇴사자 처리) 사용한다."""
+    digits = str(ssn).replace("-", "").strip()
+    if len(digits) < 7 or not digits[:7].isdigit():
+        raise ValueError(f"주민번호 형식이 올바르지 않습니다: {ssn!r}")
+    yy, mm, dd, gender_digit = digits[0:2], digits[2:4], digits[4:6], digits[6]
+    century = _CENTURY_BY_GENDER_DIGIT.get(gender_digit)
+    if century is None:
+        raise ValueError(f"주민번호 성별 구분 숫자가 올바르지 않습니다: {ssn!r}")
+    year = century + int(yy)
+    return f"{year:04d}-{mm}-{dd}"
+
+
+def previous_month(year: int, month: int) -> tuple:
+    """(year, month)의 바로 전 달을 (year, month) 튜플로 반환. 1월의 전월은
+    전년도 12월(연도 경계 처리)."""
+    if month == 1:
+        return year - 1, 12
+    return year, month - 1
