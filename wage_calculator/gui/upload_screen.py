@@ -45,4 +45,4 @@ class UploadScreen(ttk.Frame):
         except Exception as e:
             messagebox.showerror("파일 로드 오류", str(e))
             return
-        self.app.show_target_screen()
+        self.app.after_upload()

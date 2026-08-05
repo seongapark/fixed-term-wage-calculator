@@ -8,6 +8,7 @@ from gui.confirm_dialog import ConfirmRunDialog
 from gui.evidence_screen import EvidenceScreen
 from gui.result_screen import ResultScreen
 from gui.settings_dialog import SettingsDialog
+from gui.special_leave_screen import SpecialLeaveScreen, collect_pending_groups
 from gui.target_screen import TargetScreen
 from gui.upload_screen import UploadScreen
 
@@ -15,7 +16,7 @@ from gui.upload_screen import UploadScreen
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("통계조사관 임금계산 v2.2")
+        self.title("통계조사관 임금계산 v3.0")
         self.geometry("820x600")
 
         self.config_obj = Config.load()
@@ -66,6 +67,15 @@ class App(tk.Tk):
         self.people, self.missing_names, self.ambiguous_names = build_target_people(
             self.giganje_rows, self.employees
         )
+
+    def after_upload(self):
+        if collect_pending_groups(self.people):
+            self.show_special_leave_screen()
+        else:
+            self.show_target_screen()
+
+    def show_special_leave_screen(self):
+        self._set_screen(SpecialLeaveScreen(self.container, self))
 
     def show_target_screen(self):
         if self.missing_names:
