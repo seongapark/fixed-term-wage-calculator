@@ -176,8 +176,10 @@ def build_target_people(giganje_rows, employees: dict):
             # 종일 항목의 다일(多日) 사용기간은 근무일(월~금)만 하루로 집계.
             # 토/일이 기간 중간에 끼어도 원래 근무의무가 없던 날이라 공가/결근 등으로
             # 잡히면 실출근(NETWORKDAYS 기준) 계산과 불일치가 생기므로 주말은 제외.
+            # source_range=(start_d, end_d): 원본 행 전체 기간을 넘겨서, 같은 행에서
+            # 펼쳐진 이벤트들이 나중에(특별휴가 마킹 화면 등에서) 한 그룹으로 묶이게 함.
             for d in date_utils.daterange(start_d, end_d):
                 if d.weekday() < 5:
-                    person.events.append(build_event(raw_category, d))
+                    person.events.append(build_event(raw_category, d, source_range=(start_d, end_d)))
 
     return people, missing_names, ambiguous_names
