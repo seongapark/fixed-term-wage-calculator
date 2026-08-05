@@ -4,7 +4,6 @@
 파일 업로드 직후 화면에서 사람이 직접 건별(원본 행 단위)로 선택하게 한다.
 선택이 끝나야 대상자 확인 화면으로 진행할 수 있다.
 """
-import tkinter as tk
 from tkinter import messagebox, ttk
 
 from core import date_utils
@@ -110,6 +109,9 @@ class SpecialLeaveScreen(ttk.Frame):
     def _on_click(self, event):
         region = self.tree.identify_region(event.x, event.y)
         if region != "cell":
+            return
+        column = self.tree.identify_column(event.x)
+        if column != "#5":  # "유급/무급" 상태 컬럼(5번째)에서 클릭했을 때만 토글
             return
         row = self.tree.identify_row(event.y)
         if not row:
