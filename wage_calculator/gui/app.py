@@ -43,8 +43,16 @@ class App(tk.Tk):
         menubar = tk.Menu(self)
         menu = tk.Menu(menubar, tearoff=0)
         menu.add_command(label="설정", command=self.open_settings)
+        menu.add_command(label="새 파일로 시작", command=self.confirm_and_reset)
         menubar.add_cascade(label="메뉴", menu=menu)
         self.configure(menu=menubar)
+
+    def confirm_and_reset(self):
+        if messagebox.askyesno(
+            "새로 계산",
+            "처음(파일 업로드)부터 다시 시작하시겠습니까? 현재 업로드된 파일과 계산 결과는 모두 사라집니다.",
+        ):
+            self.reset()
 
     def _show_settings_reminder(self):
         self.open_settings()

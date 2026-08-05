@@ -31,7 +31,8 @@ class ResultScreen(ttk.Frame):
         bottom.pack(fill="x", padx=10, pady=10)
         ttk.Button(bottom, text="엑셀 다운로드", command=self._download).pack(side="left")
         ttk.Button(bottom, text="산정근거 확인", command=self.app.show_evidence_screen).pack(side="left", padx=8)
-        ttk.Button(bottom, text="새로 계산(처음부터)", command=self._reset).pack(side="right")
+        ttk.Button(bottom, text="새로 계산(처음부터)", command=self.app.confirm_and_reset).pack(side="right")
+        ttk.Button(bottom, text="뒤로가기", command=self._back).pack(side="right", padx=8)
 
         self.refresh()
 
@@ -59,6 +60,5 @@ class ResultScreen(ttk.Frame):
         wb.save(path)
         messagebox.showinfo("저장 완료", f"저장되었습니다:\n{path}")
 
-    def _reset(self):
-        if messagebox.askyesno("새로 계산", "처음(파일 업로드)부터 다시 시작하시겠습니까? 현재 계산 결과는 사라집니다."):
-            self.app.reset()
+    def _back(self):
+        self.app.show_target_screen()
