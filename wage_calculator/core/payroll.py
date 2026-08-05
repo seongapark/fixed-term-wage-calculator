@@ -129,7 +129,9 @@ def calc_payroll(person, config, year: int, month: int) -> PayrollResult:
 
 def _format_special_leave_note(events) -> str:
     """특별휴가 이벤트 목록을 (유급/무급 구분 + 날짜) 비고 텍스트로 요약.
-    같은 원본 행(source_range)에서 나온 이벤트는 한 항목으로 묶는다."""
+    같은 원본 행(source_range)에서 나온 이벤트는 한 항목으로 묶는다.
+    그룹은 각 그룹의 최초 날짜 기준으로 정렬해, B파일 행 순서와 무관하게
+    항상 날짜 순으로 출력되게 한다."""
     groups = {}
     order = []
     for e in events:
@@ -138,15 +140,24 @@ def _format_special_leave_note(events) -> str:
             groups[key] = []
             order.append(key)
         groups[key].append(e.d)
+    order.sort(key=lambda key: min(groups[key]))
     parts = []
     for classified, source_range in order:
         label = "유급" if classified == "유급특별휴가" else "무급"
         dates = sorted(groups[(classified, source_range)])
-        start, end = dates[0], dates[-1]
-        if start == end:
-            date_text = f"{start.month}/{start.day}"
-        else:
+        # 날짜가 전부 연속(하루 간격)일 때만 "~" 범위로 표시한다. 주말이 낀
+        # 경우처럼 중간이 비면 실제 사용일만 콤마로 나열해, 쉬지 않은 날까지
+        # 포함된 것처럼 보이는 걸 막는다.
+        contiguous = all(
+            (dates[i] - dates[i - 1]).days == 1 for i in range(1, len(dates))
+        )
+        if len(dates) == 1:
+            date_text = f"{dates[0].month}/{dates[0].day}"
+        elif contiguous:
+            start, end = dates[0], dates[-1]
             date_text = f"{start.month}/{start.day}~{end.month}/{end.day}"
+        else:
+            date_text = ", ".join(f"{d.month}/{d.day}" for d in dates)
         parts.append(f"특별휴가({label}) {date_text}")
     return ", ".join(parts)
 
