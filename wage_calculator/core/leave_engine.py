@@ -64,9 +64,11 @@ def compute_weekly_holiday_windows(contract_start: date, contract_end: date, eve
     """5-1: 계약시작일 요일 기준 7일 창을 계약기간 끝까지 반복 판정.
 
     주휴 발생 조건: 창의 월~금 5일이 모두 실근무(1분이라도 근무, 결근/종일병가나
-    8시간 전부를 조퇴 등으로 비운 날이 없어야 함) + 그 주 실근무시간 합계
-    15시간 이상 + 근무 연속성(창의 마지막 날 다음날에도 계약상 근무 예정)이
-    모두 만족될 때만 발생한다.
+    8시간 전부를 조퇴 등으로 비운 날이 없어야 함) + 근로관계가 그 주 주휴일까지
+    유지(계약 종료로 창이 주휴일 이전에 잘리지 않아야 함, 2021.4.7 행정해석
+    변경 반영 - 다음 주 근무 예정 여부는 무관)가 모두 만족될 때만 발생한다.
+    소정근로시간 15시간 이상 요건은 계약 자체(주5일 8시간)로 이미 충족되므로
+    주 단위로 재검증하지 않는다.
     """
     results = []
     idx = 1
@@ -85,8 +87,7 @@ def compute_weekly_holiday_windows(contract_start: date, contract_end: date, eve
 
         by_day = _worked_minutes_by_day(window_events, w_start, eff_end)
         worked_days = sum(1 for m in by_day.values() if m > 0)
-        total_worked_minutes = sum(by_day.values())
-        has_next_day = eff_end < contract_end
+        reaches_week_off_day = eff_end == nominal_end
 
         granted = True
         reason = "발생"
@@ -94,10 +95,8 @@ def compute_weekly_holiday_windows(contract_start: date, contract_end: date, eve
             granted, reason = False, "근무일수 5일 미만"
         elif worked_days < 5:
             granted, reason = False, "실근무 없는 날 발생(결근·종일병가 또는 8시간 전부 공제)"
-        elif total_worked_minutes < 15 * 60:
-            granted, reason = False, "주 실근무시간 15시간 미만"
-        elif not has_next_day:
-            granted, reason = False, "근무 연속성 없음(계약 마지막 주)"
+        elif not reaches_week_off_day:
+            granted, reason = False, "근로관계가 그 주 주휴일까지 유지되지 않음(계약 종료로 주휴일 이전 근로관계 종료)"
 
         results.append(WeeklyWindowResult(
             index=idx, start=w_start, end=nominal_end, effective_end=eff_end,
