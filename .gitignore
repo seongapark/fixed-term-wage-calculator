@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+wage_calculator/build/
+wage_calculator/dist/
+config.json
+*.xlsx
+*.zip
+*.exe

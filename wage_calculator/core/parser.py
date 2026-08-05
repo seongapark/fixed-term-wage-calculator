@@ -1,0 +1,183 @@
+"""3-A/3-B 입력 파일(A: 개인정보, B: 근무상황) 로더."""
+import openpyxl
+
+from . import date_utils
+from .models import Employee, TargetPerson, build_event
+
+
+def _header_index(ws):
+    headers = {}
+    for c in range(1, ws.max_column + 1):
+        v = ws.cell(row=1, column=c).value
+        if v is not None:
+            headers[str(v).strip()] = c
+    return headers
+
+
+def _row_dict(ws, row, headers):
+    return {name: ws.cell(row=row, column=col).value for name, col in headers.items()}
+
+
+def load_employees(path) -> dict:
+    """A파일(개인정보) -> {성명: [Employee, ...]}(동명이인 대비 리스트).
+
+    '생년월일' 컬럼은 필수는 아니지만, 있으면 동명이인을 구분하는 데 사용된다.
+    """
+    wb = openpyxl.load_workbook(path, data_only=True)
+    ws = wb.worksheets[0]
+    headers = _header_index(ws)
+    required = ["성명", "주민번호", "은행", "계좌번호"]
+    missing = [h for h in required if h not in headers]
+    if missing:
+        raise ValueError(f"A파일(개인정보)에 필수 컬럼이 없습니다: {missing}")
+    has_birth = "생년월일" in headers
+
+    employees = {}
+    for r in range(2, ws.max_row + 1):
+        row = _row_dict(ws, r, headers)
+        name = row.get("성명")
+        if name is None or str(name).strip() == "":
+            continue
+        name = str(name).strip()
+        emp = Employee(
+            name=name,
+            ssn=str(row.get("주민번호") or "").strip(),
+            bank=str(row.get("은행") or "").strip(),
+            account=str(row.get("계좌번호") or "").strip(),
+            birth=str(row.get("생년월일") or "").strip() if has_birth else "",
+        )
+        employees.setdefault(name, []).append(emp)
+    return employees
+
+
+def load_giganje_rows(path) -> list:
+    """B파일(근무상황) 로드 후 직급에 '기간제'가 포함된 행만 반환(원본 dict 리스트)."""
+    wb = openpyxl.load_workbook(path, data_only=True)
+    ws = wb.worksheets[0]
+    headers = _header_index(ws)
+    required = ["소속", "직급", "성명", "생년월일", "종별", "사용기간(날짜)", "사용시간(시분)"]
+    missing = [h for h in required if h not in headers]
+    if missing:
+        raise ValueError(f"B파일(근무상황)에 필수 컬럼이 없습니다: {missing}")
+
+    rows = []
+    for r in range(2, ws.max_row + 1):
+        row = _row_dict(ws, r, headers)
+        name = row.get("성명")
+        if name is None or str(name).strip() == "":
+            continue
+        rank = str(row.get("직급") or "")
+        if "기간제" not in rank:
+            continue
+        row["성명"] = str(name).strip()
+        rows.append(row)
+    return rows
+
+
+def person_key(name: str, birth: str) -> str:
+    return f"{name}::{birth}"
+
+
+def display_label(name: str, birth: str, all_names: list) -> str:
+    """동명이인이 있는 경우에만 성명 뒤에 생년월일을 붙여 화면에 구분 표시."""
+    if all_names.count(name) > 1:
+        return f"{name}({birth})" if birth else name
+    return name
+
+
+def build_target_people(giganje_rows, employees: dict):
+    """A파일(개인정보) 전원을 급여 대상자 로스터로 삼고, B파일(근무상황, 기간제만
+    필터링된 행)의 사용 이력을 이름/생년월일로 매칭해 이벤트로 붙인다.
+
+    B파일(근무상황현황)은 실제로는 "사용 이력이 있는 건(행)만" 나열되는 방식이라,
+    이번 달에 조퇴/외출/공가 등 아무 이력이 없는 사람(만근자)은 B파일에 행 자체가
+    없다. 로스터를 B파일 기준으로 잡으면 그런 만근자가 급여 계산에서 통째로
+    빠지므로, 로스터는 반드시 A파일 기준으로 잡고 B파일은 이벤트 매칭용
+    보조데이터로만 사용한다. 매칭되는 이벤트가 하나도 없으면 공제 없는 만근으로
+    남아 풀로 급여가 지급된다.
+
+    키는 '성명::생년월일' 문자열(동명이인이어도 서로 다른 사람으로 분리됨).
+    반환값: (people, missing_names, ambiguous_names)
+      - missing_names: B파일 근무상황에는 있는데 A파일에 아예 없는 성명(오탈자/누락 의심)
+      - ambiguous_names: A파일에 동명이인이 있는데 생년월일로 구분할 수 없는 성명
+        (잘못된 사람에게 계좌/주민번호가 붙는 사고를 막기 위해 로스터에서 제외됨 ->
+        A파일 보완 전까지 급여 계산 불가)
+    """
+    people = {}
+    ambiguous_names = []
+    name_index = {}  # 성명 -> [TargetPerson, ...] (로스터에 실제로 올라간 사람만)
+
+    for name, candidates in employees.items():
+        if len(candidates) == 1:
+            emp = candidates[0]
+            person = TargetPerson(
+                name=name, birth=emp.birth, ssn=emp.ssn, bank=emp.bank, account=emp.account,
+            )
+            people[person_key(name, emp.birth)] = person
+            name_index[name] = [person]
+            continue
+
+        # A파일 내 동명이인: 생년월일이 전원 채워져 있고 서로 달라야 안전하게 구분 가능.
+        # 그렇지 않으면 절대 임의로 매칭하지 않는다(잘못된 사람에게 계좌/주민번호가
+        # 붙는 사고를 막기 위함).
+        births = [c.birth for c in candidates]
+        if any(not b for b in births) or len(set(births)) != len(births):
+            ambiguous_names.append(name)
+            continue
+
+        persons = []
+        for emp in candidates:
+            person = TargetPerson(
+                name=name, birth=emp.birth, ssn=emp.ssn, bank=emp.bank, account=emp.account,
+            )
+            people[person_key(name, emp.birth)] = person
+            persons.append(person)
+        name_index[name] = persons
+
+    missing_names = []
+
+    for row in giganje_rows:
+        name = row["성명"]
+        birth = str(row.get("생년월일") or "").strip()
+
+        candidates = name_index.get(name, [])
+        person = None
+        if len(candidates) == 1:
+            person = candidates[0]
+        elif len(candidates) > 1:
+            person = people.get(person_key(name, birth))
+
+        if person is None:
+            if name not in ambiguous_names and name not in missing_names:
+                missing_names.append(name)
+            continue
+
+        person.dept = str(row.get("소속") or "") or person.dept
+        person.rank = str(row.get("직급") or "") or person.rank
+
+        raw_category = row.get("종별")
+        date_field = row.get("사용기간(날짜)")
+        if raw_category is None or str(raw_category).strip() == "" or date_field is None:
+            continue  # 사용 내역 없음(만근) 행
+        raw_category = str(raw_category).strip()
+
+        time_field = row.get("사용시간(시분)")
+        time_range = date_utils.parse_time_range(time_field)
+        start_d, end_d = date_utils.parse_date_range(date_field)
+
+        if time_range is not None:
+            # 시간 기재분: 단일 날짜에만 적용(사양상 다일+시간 조합은 발생하지 않음)
+            t_start, t_end = time_range
+            minutes = date_utils.deduct_minutes(t_start, t_end)
+            person.events.append(
+                build_event(raw_category, start_d, t_start, t_end, minutes)
+            )
+        else:
+            # 종일 항목의 다일(多日) 사용기간은 근무일(월~금)만 하루로 집계.
+            # 토/일이 기간 중간에 끼어도 원래 근무의무가 없던 날이라 공가/결근 등으로
+            # 잡히면 실출근(NETWORKDAYS 기준) 계산과 불일치가 생기므로 주말은 제외.
+            for d in date_utils.daterange(start_d, end_d):
+                if d.weekday() < 5:
+                    person.events.append(build_event(raw_category, d))
+
+    return people, missing_names, ambiguous_names
