@@ -1,9 +1,11 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+from core import date_utils
 from core.config import Config
-from core.parser import build_target_people, load_employees, load_giganje_rows
+from core.parser import build_target_people, load_employees, load_giganje_rows, load_previous_payroll
 from core.payroll import calc_payroll
+from core.retroactive import compute_retroactive
 from gui.confirm_dialog import ConfirmRunDialog, ContractPeriodCheckDialog
 from gui.evidence_screen import EvidenceScreen
 from gui.result_screen import ResultScreen
@@ -28,6 +30,9 @@ class App(tk.Tk):
         self.work_year = None
         self.work_month = None
         self.results = []
+        self.previous_payroll = {}
+        self.retro_adjustments = {}
+        self.departed_results = []
 
         self._build_menu()
         self.container = ttk.Frame(self)
@@ -69,12 +74,13 @@ class App(tk.Tk):
     def show_upload_screen(self):
         self._set_screen(UploadScreen(self.container, self))
 
-    def load_files(self, a_path, b_path):
+    def load_files(self, a_path, b_path, prev_payroll_path=None):
         self.employees = load_employees(a_path)
         self.giganje_rows = load_giganje_rows(b_path)
         self.people, self.missing_names, self.ambiguous_names = build_target_people(
             self.giganje_rows, self.employees
         )
+        self.previous_payroll = load_previous_payroll(prev_payroll_path) if prev_payroll_path else {}
 
     def after_upload(self):
         # A파일 데이터 문제(누락/동명이인)는 업로드 직후 바로 알려야 한다.
@@ -117,6 +123,9 @@ class App(tk.Tk):
         self.work_year = None
         self.work_month = None
         self.results = []
+        self.previous_payroll = {}
+        self.retro_adjustments = {}
+        self.departed_results = []
         self.show_upload_screen()
 
     def open_contract_period_check_dialog(self):
@@ -134,9 +143,22 @@ class App(tk.Tk):
                 results.append(calc_payroll(person, self.config_obj, self.work_year, self.work_month))
             except Exception as e:
                 errors.append(f"{person.name}: {e}")
+        self.results = results
+
+        self.retro_adjustments = {}
+        self.departed_results = []
+        if self.previous_payroll:
+            prev_year, prev_month = date_utils.previous_month(self.work_year, self.work_month)
+            try:
+                self.retro_adjustments, self.departed_results = compute_retroactive(
+                    self.people, self.previous_payroll, self.giganje_rows,
+                    self.config_obj, prev_year, prev_month,
+                )
+            except Exception as e:
+                errors.append(f"소급계산 오류: {e}")
+
         if errors:
             messagebox.showwarning("일부 대상자 계산 오류", "\n".join(errors))
-        self.results = results
         self.show_result_screen()
 
     def show_result_screen(self):
