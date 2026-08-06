@@ -18,7 +18,7 @@ from gui.upload_screen import UploadScreen
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("통계조사관 임금계산 v3.0")
+        self.title("통계조사관 임금계산 v4.0")
         self.geometry("820x600")
 
         self.config_obj = Config.load()
