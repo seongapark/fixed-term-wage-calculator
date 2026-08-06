@@ -32,7 +32,8 @@ def test_departed_person_with_leftover_rows_is_recalculated():
             "사용기간(날짜)": "2026-06-29", "사용시간(시분)": None,
         },
     ]
-    departed = departed_retroactive({}, previous_payroll, giganje_rows, _config(), 2026, 6)
+    departed, errors = departed_retroactive({}, previous_payroll, giganje_rows, _config(), 2026, 6)
+    assert errors == [], errors
     assert len(departed) == 1, departed
     d = departed[0]
     assert d.name == "최도영"
@@ -50,8 +51,9 @@ def test_departed_person_with_no_leftover_rows_is_skipped():
             "bank": "하나은행", "account": "111",
         },
     }
-    departed = departed_retroactive({}, previous_payroll, [], _config(), 2026, 6)
+    departed, errors = departed_retroactive({}, previous_payroll, [], _config(), 2026, 6)
     assert departed == [], "당월 B파일에 잔여 행이 없으면 출력 대상에서 빠져야 함"
+    assert errors == []
     print("OK: test_departed_person_with_no_leftover_rows_is_skipped")
 
 
@@ -71,14 +73,18 @@ def test_departed_person_name_collision_with_different_birth_is_ignored():
             "종별": "결근", "사용기간(날짜)": "2026-06-29", "사용시간(시분)": None,
         },
     ]
-    departed = departed_retroactive({}, previous_payroll, giganje_rows, _config(), 2026, 6)
+    departed, errors = departed_retroactive({}, previous_payroll, giganje_rows, _config(), 2026, 6)
     assert departed == [], "생년월일이 다른 동명이인의 행을 매칭하면 안 됨"
+    assert errors == []
     print("OK: test_departed_person_name_collision_with_different_birth_is_ignored")
 
 
 def test_compute_retroactive_combines_both():
     result = compute_retroactive({}, {}, [], _config(), 2026, 6)
-    assert result == ({}, [])
+    assert result.adjustments == {}
+    assert result.details == {}
+    assert result.departed == []
+    assert result.errors == []
     print("OK: test_compute_retroactive_combines_both")
 
 
@@ -101,8 +107,9 @@ def test_departed_person_matches_when_birth_cell_is_a_real_date():
             "종별": "결근", "사용기간(날짜)": "2026-06-29", "사용시간(시분)": None,
         },
     ]
-    departed = departed_retroactive({}, previous_payroll, giganje_rows, _config(), 2026, 6)
+    departed, errors = departed_retroactive({}, previous_payroll, giganje_rows, _config(), 2026, 6)
     assert len(departed) == 1, f"datetime 셀 때문에 매칭 실패(버그 재현): {departed}"
+    assert errors == []
     print("OK: test_departed_person_matches_when_birth_cell_is_a_real_date")
 
 
@@ -122,9 +129,36 @@ def test_departed_person_blank_contract_dates_is_skipped_not_crashed():
             "사용기간(날짜)": "2026-06-29", "사용시간(시분)": None,
         },
     ]
-    departed = departed_retroactive({}, previous_payroll, giganje_rows, _config(), 2026, 6)
+    departed, errors = departed_retroactive({}, previous_payroll, giganje_rows, _config(), 2026, 6)
     assert departed == [], departed
+    assert errors == []
     print("OK: test_departed_person_blank_contract_dates_is_skipped_not_crashed")
+
+
+def test_one_persons_recalc_error_does_not_wipe_out_the_rest():
+    """소급계산 개별 오류 수집: 완전퇴사자 재계산 중 한 명이 실패해도(여기서는
+    요율 미등록으로 재현) 그 사람만 빠지고 errors에 사유가 남으며, 함수
+    자체는 예외 없이 끝까지 완료돼야 한다."""
+    config_without_rates = Config({"surveys": [], "rates": {}, "holidays": []})
+    previous_payroll = {
+        "980126-2641395": {
+            "ssn": "980126-2641395", "name": "최도영",
+            "contract_start": date(2026, 6, 1), "contract_end": date(2026, 6, 30),
+            "total_payment": 2000000, "bank": "", "account": "",
+        },
+    }
+    giganje_rows = [
+        {
+            "소속": "부산지방고용노동청", "직급": "기간제근로자", "성명": "최도영",
+            "생년월일": "1998-01-26", "종별": "결근",
+            "사용기간(날짜)": "2026-06-29", "사용시간(시분)": None,
+        },
+    ]
+    departed, errors = departed_retroactive({}, previous_payroll, giganje_rows, config_without_rates, 2026, 6)
+    assert departed == [], departed
+    assert len(errors) == 1, errors
+    assert "최도영" in errors[0], errors
+    print("OK: test_one_persons_recalc_error_does_not_wipe_out_the_rest")
 
 
 if __name__ == "__main__":
@@ -134,4 +168,5 @@ if __name__ == "__main__":
     test_compute_retroactive_combines_both()
     test_departed_person_matches_when_birth_cell_is_a_real_date()
     test_departed_person_blank_contract_dates_is_skipped_not_crashed()
+    test_one_persons_recalc_error_does_not_wipe_out_the_rest()
     print("ALL OK")

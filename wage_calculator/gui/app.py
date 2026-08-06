@@ -32,6 +32,7 @@ class App(tk.Tk):
         self.results = []
         self.previous_payroll = {}
         self.retro_adjustments = {}
+        self.retro_details = {}
         self.departed_results = []
 
         self._build_menu()
@@ -123,6 +124,7 @@ class App(tk.Tk):
         self.results = []
         self.previous_payroll = {}
         self.retro_adjustments = {}
+        self.retro_details = {}
         self.departed_results = []
         self.show_upload_screen()
 
@@ -144,14 +146,19 @@ class App(tk.Tk):
         self.results = results
 
         self.retro_adjustments = {}
+        self.retro_details = {}
         self.departed_results = []
         if self.previous_payroll:
             prev_year, prev_month = date_utils.previous_month(self.work_year, self.work_month)
             try:
-                self.retro_adjustments, self.departed_results = compute_retroactive(
+                retro = compute_retroactive(
                     self.people, self.previous_payroll, self.giganje_rows,
                     self.config_obj, prev_year, prev_month,
                 )
+                self.retro_adjustments = retro.adjustments
+                self.retro_details = retro.details
+                self.departed_results = retro.departed
+                errors.extend(retro.errors)
             except Exception as e:
                 errors.append(f"소급계산 오류: {e}")
 

@@ -31,10 +31,17 @@ def test_adjustment_is_recalculated_minus_previously_paid():
             "bank": "", "account": "",
         },
     }
-    adjustments = current_month_adjustments(people, previous_payroll, _config(), 2026, 6)
+    adjustments, details, errors = current_month_adjustments(people, previous_payroll, _config(), 2026, 6)
     key = person_key("김철수", "19900101")
+    assert errors == [], errors
     assert key in adjustments
     assert adjustments[key] > 0, "재계산액이 더 크므로 추가지급(양수)이어야 함: " + str(adjustments[key])
+    # details에는 산정근거 시트가 수식(=재계산액-전월실지급액)을 그릴 수 있도록
+    # 원천 두 숫자가 함께 담겨 있어야 한다.
+    assert key in details
+    assert details[key].prev_paid == 1000000
+    assert details[key].adjustment == adjustments[key]
+    assert details[key].recalculated - details[key].prev_paid == adjustments[key]
     print("OK: test_adjustment_is_recalculated_minus_previously_paid")
 
 
@@ -45,8 +52,12 @@ def test_no_previous_entry_means_zero_adjustment():
         events=[],
     )
     people = {person_key("박신입", "19950505"): person}
-    adjustments = current_month_adjustments(people, {}, _config(), 2026, 6)
-    assert adjustments[person_key("박신입", "19950505")] == 0
+    adjustments, details, errors = current_month_adjustments(people, {}, _config(), 2026, 6)
+    key = person_key("박신입", "19950505")
+    assert adjustments[key] == 0
+    # 비교할 전월 데이터 자체가 없으므로 수식을 그릴 원천 숫자도 없다 - details에 없어야 함.
+    assert key not in details
+    assert errors == []
     print("OK: test_no_previous_entry_means_zero_adjustment")
 
 
@@ -69,12 +80,13 @@ def test_reassigned_contract_does_not_cause_full_clawback():
             "bank": "", "account": "",
         },
     }
-    adjustments = current_month_adjustments(people, previous_payroll, _config(), 2026, 6)
+    adjustments, details, errors = current_month_adjustments(people, previous_payroll, _config(), 2026, 6)
     key = person_key("김철수", "19900101")
     # 전월 계약기간(6월 한 달)으로 정상 재계산되면 실지급액과 비슷한 범위여야 하고,
     # 절대 "-전월실지급액"(즉 전월분 전액 환수)이 나오면 안 된다.
     assert adjustments[key] != -2045440, f"버그 재현: 전월 실지급액 전액이 그대로 환수됨: {adjustments[key]}"
     assert adjustments[key] > -1000000, f"재계산액이 비정상적으로 작음(계약기간 버그 의심): {adjustments[key]}"
+    assert errors == []
     print("OK: test_reassigned_contract_does_not_cause_full_clawback")
 
 
@@ -97,9 +109,43 @@ def test_blank_previous_contract_dates_skip_that_person_only():
             "bank": "", "account": "",
         },
     }
-    adjustments = current_month_adjustments(people, previous_payroll, _config(), 2026, 6)
-    assert adjustments[person_key("김철수", "19900101")] == 0
+    adjustments, details, errors = current_month_adjustments(people, previous_payroll, _config(), 2026, 6)
+    key = person_key("김철수", "19900101")
+    assert adjustments[key] == 0
+    assert key not in details
+    assert errors == []
     print("OK: test_blank_previous_contract_dates_skip_that_person_only")
+
+
+def test_one_persons_recalc_error_does_not_wipe_out_the_rest():
+    """소급계산 개별 오류 수집: 한 명의 전월 재계산이 실패해도(여기서는
+    2026년 요율을 아예 등록 안 해서 calc_payroll이 ValueError를 던지도록
+    재현) 그 사람만 소급 0 + errors에 사유가 남고, 다른 사람은 정상적으로
+    소급조정액이 계산돼야 한다(전체가 죽던 버그의 재발 방지 테스트)."""
+    config_without_rates = Config({"surveys": [], "rates": {}, "holidays": []})
+
+    broken_person = TargetPerson(
+        name="문제있는사람", birth="19900101", ssn="900101-1234567", bank="", account="",
+        survey_name="테스트조사", contract_start=date(2026, 6, 1), contract_end=date(2026, 6, 30),
+        events=[],
+    )
+    people = {person_key("문제있는사람", "19900101"): broken_person}
+    previous_payroll = {
+        "900101-1234567": {
+            "ssn": "900101-1234567", "name": "문제있는사람",
+            "contract_start": date(2026, 6, 1), "contract_end": date(2026, 6, 30),
+            "total_payment": 1000000, "bank": "", "account": "",
+        },
+    }
+    adjustments, details, errors = current_month_adjustments(
+        people, previous_payroll, config_without_rates, 2026, 6,
+    )
+    key = person_key("문제있는사람", "19900101")
+    assert adjustments[key] == 0, adjustments
+    assert key not in details
+    assert len(errors) == 1, errors
+    assert "문제있는사람" in errors[0], errors
+    print("OK: test_one_persons_recalc_error_does_not_wipe_out_the_rest")
 
 
 if __name__ == "__main__":
@@ -107,4 +153,5 @@ if __name__ == "__main__":
     test_no_previous_entry_means_zero_adjustment()
     test_reassigned_contract_does_not_cause_full_clawback()
     test_blank_previous_contract_dates_skip_that_person_only()
+    test_one_persons_recalc_error_does_not_wipe_out_the_rest()
     print("ALL OK")

@@ -58,6 +58,7 @@ class ResultScreen(ttk.Frame):
             self.app.results, self.app.config_obj,
             giganje_rows=self.app.giganje_rows,
             retro_adjustments=self.app.retro_adjustments,
+            retro_details=self.app.retro_details,
         )
         filename = output_filename(self.app.work_year, self.app.work_month)
         path = Path(downloads_dir()) / filename

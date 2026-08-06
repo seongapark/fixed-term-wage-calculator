@@ -8,6 +8,7 @@ import openpyxl
 from core.config import Config
 from core.parser import person_key
 from core.payroll import PayrollResult
+from core.retroactive import RetroDetail
 from output.evidence_sheet import build_evidence_sheet, COL
 
 
@@ -43,11 +44,36 @@ def test_formula_cells_reference_same_row_inputs():
     assert ws.cell(row=row, column=COL["late_out_deduction"]).value == "=ROUNDDOWN(C2/60*E2,-1)"
     assert ws.cell(row=row, column=COL["base_pay"]).value == "=ROUNDDOWN(N2-O2,-1)"
     assert ws.cell(row=row, column=COL["total_payment"]).value == "=ROUNDDOWN(P2+Q2+R2+S2,-1)"
+    # retro_details가 없으면(전월파일이 없거나 이 사람은 전월파일에 없는 경우)
+    # 소급조정액은 기존처럼 리터럴 값 그대로.
     assert ws.cell(row=row, column=COL["retro_adjustment"]).value == -10000
-    assert ws.cell(row=row, column=COL["final_payment"]).value == "=T2+U2"
+    assert ws.cell(row=row, column=COL["final_payment"]).value == "=T2+W2"
     print("OK: test_formula_cells_reference_same_row_inputs")
+
+
+def test_retro_adjustment_is_a_formula_when_detail_is_available():
+    """전월 재계산이 실제로 이뤄진 사람(retro_details에 항목이 있음)은
+    소급조정액이 리터럴이 아니라 '=전월재계산액-전월실지급액' 수식이어야
+    하고, 두 원천 숫자도 입력값 셀로 함께 보여야 한다."""
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+    result = _result()
+    key = person_key(result.name, result.birth)
+    detail = RetroDetail(recalculated=2100000, prev_paid=2000000, adjustment=100000)
+    ws = build_evidence_sheet(
+        wb, [result], _config(),
+        retro_adjustments={key: 100000}, retro_details={key: detail},
+    )
+
+    row = 2
+    assert ws.cell(row=row, column=COL["retro_recalculated"]).value == 2100000
+    assert ws.cell(row=row, column=COL["retro_prev_paid"]).value == 2000000
+    assert ws.cell(row=row, column=COL["retro_adjustment"]).value == "=U2-V2"
+    assert ws.cell(row=row, column=COL["final_payment"]).value == "=T2+W2"
+    print("OK: test_retro_adjustment_is_a_formula_when_detail_is_available")
 
 
 if __name__ == "__main__":
     test_formula_cells_reference_same_row_inputs()
+    test_retro_adjustment_is_a_formula_when_detail_is_available()
     print("ALL OK")

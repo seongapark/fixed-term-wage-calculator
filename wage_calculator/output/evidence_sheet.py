@@ -18,7 +18,8 @@ COL = {
     "remaining_leave_days": 10, "is_final_month": 11,
     "daily_wage": 12, "daily_meal": 13, "gross_pay": 14, "late_out_deduction": 15,
     "base_pay": 16, "weekly_holiday_pay": 17, "meal_allowance": 18, "leave_compensation": 19,
-    "total_payment": 20, "retro_adjustment": 21, "final_payment": 22,
+    "total_payment": 20, "retro_recalculated": 21, "retro_prev_paid": 22,
+    "retro_adjustment": 23, "final_payment": 24,
 }
 
 HEADERS = {
@@ -30,6 +31,7 @@ HEADERS = {
     "gross_pay": "급여액", "late_out_deduction": "조퇴외출공제", "base_pay": "기본급",
     "weekly_holiday_pay": "주휴수당", "meal_allowance": "정액급식비",
     "leave_compensation": "연가보상비", "total_payment": "지급총액",
+    "retro_recalculated": "전월재계산액", "retro_prev_paid": "전월실지급액",
     "retro_adjustment": "소급조정액", "final_payment": "최종지급액",
 }
 
@@ -46,11 +48,17 @@ def _write_headers(ws):
         ws.column_dimensions[get_column_letter(col)].width = 12
 
 
-def build_evidence_sheet(wb, results, config, retro_adjustments=None):
-    """results: list[PayrollResult]. retro_adjustments: dict[person_key, int]."""
+def build_evidence_sheet(wb, results, config, retro_adjustments=None, retro_details=None):
+    """results: list[PayrollResult]. retro_adjustments: dict[person_key, int].
+    retro_details: dict[person_key, core.retroactive.RetroDetail] - 있으면(당월
+    대상자이면서 전월 재계산이 실제로 이뤄진 경우) 소급조정액을 리터럴이 아니라
+    '=전월재계산액-전월실지급액' 수식으로 표시하고, 두 원천 숫자도 입력값
+    셀로 함께 보여준다. 없으면(전월파일이 아예 없거나 그 사람은 전월파일에
+    없는 경우) 기존처럼 0을 그대로 적는다."""
     from core.parser import person_key
 
     retro_adjustments = retro_adjustments or {}
+    retro_details = retro_details or {}
     ws = wb.create_sheet(SHEET_NAME)
     _write_headers(ws)
 
@@ -96,8 +104,15 @@ def build_evidence_sheet(wb, results, config, retro_adjustments=None):
                     f"+{_addr(row,'meal_allowance')}+{_addr(row,'leave_compensation')},-1)"
                 ))
 
-        adjustment = retro_adjustments.get(person_key(r.name, r.birth), 0)
-        ws.cell(row=row, column=COL["retro_adjustment"], value=adjustment)
+        key = person_key(r.name, r.birth)
+        detail = retro_details.get(key)
+        if detail is not None:
+            ws.cell(row=row, column=COL["retro_recalculated"], value=detail.recalculated)
+            ws.cell(row=row, column=COL["retro_prev_paid"], value=detail.prev_paid)
+            ws.cell(row=row, column=COL["retro_adjustment"],
+                    value=f"={_addr(row,'retro_recalculated')}-{_addr(row,'retro_prev_paid')}")
+        else:
+            ws.cell(row=row, column=COL["retro_adjustment"], value=retro_adjustments.get(key, 0))
         ws.cell(row=row, column=COL["final_payment"],
                 value=f"={_addr(row,'total_payment')}+{_addr(row,'retro_adjustment')}")
 
