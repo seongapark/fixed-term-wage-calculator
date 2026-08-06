@@ -53,14 +53,6 @@ class TargetScreen(ttk.Frame):
         self.month_var = tk.StringVar(value=str(date.today().month))
         ttk.Entry(top, textvariable=self.month_var, width=4).pack(side="left", padx=(2, 12))
 
-        if self.app.missing_names:
-            warn = ttk.Label(
-                self,
-                text=f"※ B파일 기간제 대상자 중 A파일에 없는 성명: {', '.join(self.app.missing_names)} "
-                     f"(A파일 보완 후 다시 업로드해야 진행 가능)",
-                foreground="red", wraplength=760,
-            )
-            warn.pack(fill="x", padx=10)
 
         columns = ("check", "name", "survey", "start", "end")
         self.tree = ttk.Treeview(self, columns=columns, show="headings", height=14)
@@ -156,9 +148,6 @@ class TargetScreen(ttk.Frame):
         self.refresh()
 
     def _proceed(self):
-        if self.app.missing_names:
-            messagebox.showerror("진행 불가", "A파일에 없는 대상자가 있어 계산을 진행할 수 없습니다.")
-            return
         if self.app.ambiguous_names:
             messagebox.showerror(
                 "진행 불가",

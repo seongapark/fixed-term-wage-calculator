@@ -83,17 +83,15 @@ class App(tk.Tk):
         self.previous_payroll = load_previous_payroll(prev_payroll_path) if prev_payroll_path else {}
 
     def after_upload(self):
-        # A파일 데이터 문제(누락/동명이인)는 업로드 직후 바로 알려야 한다.
+        # A파일 데이터 문제(동명이인)는 업로드 직후 바로 알려야 한다.
         # 특별휴가 마킹 화면으로 먼저 라우팅되면, 사용자가 건별 유급/무급을
         # 전부 클릭한 뒤에야 "A파일 다시 올리세요"를 보게 되는 낭비가 생기므로
         # 이 체크는 특별휴가 라우팅 분기보다 먼저 실행한다.
-        if self.missing_names:
-            messagebox.showerror(
-                "대상자 확인 필요",
-                "B파일(근무상황)의 기간제 대상자 중 A파일(개인정보)에 없는 성명이 있습니다:\n"
-                + ", ".join(self.missing_names)
-                + "\n\nA파일을 보완한 뒤 다시 업로드해야 임금 산정을 진행할 수 있습니다.",
-            )
+        #
+        # missing_names(B파일에는 있는데 A파일에 없는 성명)는 더 이상 경고하지
+        # 않는다 - B파일에 직급 무관 전 직원이 섞여 나올 수 있어(직급 필터
+        # 제거, parser.py 참고) A파일에 없는 사람은 애초에 급여 대상이 아니라는
+        # 뜻이므로, 그냥 A파일 대상자만 정상적으로 급여 계산하면 된다.
         if self.ambiguous_names:
             messagebox.showerror(
                 "동명이인 구분 필요",
