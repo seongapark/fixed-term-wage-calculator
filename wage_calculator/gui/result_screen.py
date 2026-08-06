@@ -4,7 +4,7 @@ from tkinter import messagebox, ttk
 
 from core.parser import display_label, person_key
 from core.paths import downloads_dir
-from output.build import build_workbook, output_filename
+from output.build import build_workbook, build_departed_workbook, output_filename, departed_output_filename
 
 
 class ResultScreen(ttk.Frame):
@@ -54,11 +54,23 @@ class ResultScreen(ttk.Frame):
             self.app.show_evidence_screen(selected_key=sel[0])
 
     def _download(self):
-        wb = build_workbook(self.app.results, self.app.giganje_rows)
+        wb = build_workbook(
+            self.app.results, self.app.config_obj,
+            giganje_rows=self.app.giganje_rows,
+            retro_adjustments=self.app.retro_adjustments,
+        )
         filename = output_filename(self.app.work_year, self.app.work_month)
         path = Path(downloads_dir()) / filename
         wb.save(path)
-        messagebox.showinfo("저장 완료", f"저장되었습니다:\n{path}")
+        saved = [str(path)]
+
+        if self.app.departed_results:
+            departed_wb = build_departed_workbook(self.app.departed_results)
+            departed_path = Path(downloads_dir()) / departed_output_filename(self.app.work_year, self.app.work_month)
+            departed_wb.save(departed_path)
+            saved.append(str(departed_path))
+
+        messagebox.showinfo("저장 완료", "저장되었습니다:\n" + "\n".join(saved))
 
     def _back(self):
         self.app.show_target_screen()
