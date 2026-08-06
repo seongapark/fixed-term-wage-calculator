@@ -50,7 +50,36 @@ def test_no_previous_entry_means_zero_adjustment():
     print("OK: test_no_previous_entry_means_zero_adjustment")
 
 
+def test_reassigned_contract_does_not_cause_full_clawback():
+    """당월에 새 조사로 재배정되어 계약기간이 전월보다 늦게 시작하는 사람도,
+    전월 재계산은 전월 파일의 계약기간을 써야 하므로 정상 재계산되고
+    전월 실지급액 전액이 소급 환수되면 안 된다(회귀 버그 재현 테스트)."""
+    person = TargetPerson(
+        name="김철수", birth="19900101", ssn="900101-1234567", bank="", account="",
+        survey_name="새조사",
+        contract_start=date(2026, 7, 1), contract_end=date(2026, 9, 30),  # 당월(7월) 재배정 계약
+        events=[],
+    )
+    people = {person_key("김철수", "19900101"): person}
+    previous_payroll = {
+        "900101-1234567": {
+            "ssn": "900101-1234567", "name": "김철수",
+            "contract_start": date(2026, 6, 1), "contract_end": date(2026, 6, 30),  # 전월(6월) 실제 계약기간
+            "total_payment": 2045440,
+            "bank": "", "account": "",
+        },
+    }
+    adjustments = current_month_adjustments(people, previous_payroll, _config(), 2026, 6)
+    key = person_key("김철수", "19900101")
+    # 전월 계약기간(6월 한 달)으로 정상 재계산되면 실지급액과 비슷한 범위여야 하고,
+    # 절대 "-전월실지급액"(즉 전월분 전액 환수)이 나오면 안 된다.
+    assert adjustments[key] != -2045440, f"버그 재현: 전월 실지급액 전액이 그대로 환수됨: {adjustments[key]}"
+    assert adjustments[key] > -1000000, f"재계산액이 비정상적으로 작음(계약기간 버그 의심): {adjustments[key]}"
+    print("OK: test_reassigned_contract_does_not_cause_full_clawback")
+
+
 if __name__ == "__main__":
     test_adjustment_is_recalculated_minus_previously_paid()
     test_no_previous_entry_means_zero_adjustment()
+    test_reassigned_contract_does_not_cause_full_clawback()
     print("ALL OK")

@@ -37,7 +37,7 @@ def main():
         person.contract_end = contract_end
 
     all_results = [calc_payroll(p, config, 2026, 7) for p in people.values()]
-    wb = build_workbook(all_results, rows)
+    wb = build_workbook(all_results, config, giganje_rows=rows)
     out_path = Path(__file__).resolve().parent / output_filename(2026, 7)
     wb.save(out_path)
     print(f"[엑셀 저장] {out_path}")

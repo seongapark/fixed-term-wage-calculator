@@ -22,16 +22,43 @@ class DepartedRetro:
 def current_month_adjustments(people, previous_payroll, config, prev_year, prev_month):
     """당월 로스터(people) 각자에 대해, 전월 파일에도 같은 주민번호가 있으면
     전월분을 다시 계산해 소급조정액(재계산액-전월실지급액)을 구한다. 전월
-    파일에 없으면(신규입사자 등) 소급 없음(0)."""
+    파일에 없으면(신규입사자 등) 소급 없음(0).
+
+    재계산은 반드시 전월 파일에 기록된 '전월 계약기간'(prev)을 써야 한다 -
+    당월 계약기간(person.contract_start/end)은 이번 달에 새 조사로 재배정되며
+    바뀌어 있을 수 있고, 그 경우 전월 시점 기준으로는 계약이 아직 시작 전이라
+    급여기간이 통째로 비어(전월 총액이 0으로 재계산되어) 실지급액 전액이
+    그대로 환수로 잡히는 사고가 난다. 이벤트(person.events)는 당월 B파일의
+    더 완전한 데이터를 그대로 써야 하므로 person 것을 재사용한다."""
     adjustments = {}
     for key, person in people.items():
         prev = previous_payroll.get(person.ssn)
         if prev is None:
             adjustments[key] = 0
             continue
-        recalculated = calc_payroll(person, config, prev_year, prev_month)
+        temp_person = TargetPerson(
+            name=person.name, birth=person.birth, ssn=person.ssn,
+            bank=person.bank, account=person.account,
+            contract_start=prev["contract_start"], contract_end=prev["contract_end"],
+            events=person.events,
+        )
+        recalculated = calc_payroll(temp_person, config, prev_year, prev_month)
         adjustments[key] = recalculated.total_payment - prev["total_payment"]
     return adjustments
+
+
+def _row_birth_matches(row, expected_birth):
+    """B파일 행의 '생년월일' 셀을 expected_birth("YYYY-MM-DD" 문자열)와
+    비교한다. openpyxl은 날짜형 셀을 datetime으로 반환하므로 str()로 그냥
+    비교하면 "1998-01-26 00:00:00" 같은 시간 포함 문자열이 되어 매칭이
+    조용히 실패한다 - date_utils.parse_date로 정규화한 뒤 비교해야 한다."""
+    raw = row.get("생년월일")
+    if raw is None or str(raw).strip() == "":
+        return False
+    try:
+        return date_utils.parse_date(raw).isoformat() == expected_birth
+    except ValueError:
+        return False  # 형식이 이상한 값은 안전하게 비매칭 처리(전체 실패 방지)
 
 
 def departed_retroactive(people, previous_payroll, giganje_rows, config, prev_year, prev_month):
@@ -54,7 +81,7 @@ def departed_retroactive(people, previous_payroll, giganje_rows, config, prev_ye
         matched_rows = [
             row for row in giganje_rows
             if str(row.get("성명") or "").strip() == prev["name"]
-            and str(row.get("생년월일") or "").strip() == expected_birth
+            and _row_birth_matches(row, expected_birth)
         ]
         if not matched_rows:
             continue

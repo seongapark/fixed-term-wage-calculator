@@ -82,9 +82,34 @@ def test_compute_retroactive_combines_both():
     print("OK: test_compute_retroactive_combines_both")
 
 
+def test_departed_person_matches_when_birth_cell_is_a_real_date():
+    """B파일 '생년월일' 셀이 문자열이 아니라 실제 datetime(openpyxl이 날짜형
+    셀을 읽을 때 흔한 경우)이어도 정상 매칭돼야 한다(회귀 버그 재현 테스트)."""
+    from datetime import date, datetime
+    previous_payroll = {
+        "980126-2641395": {
+            "ssn": "980126-2641395", "name": "최도영",
+            "contract_start": date(2026, 6, 1), "contract_end": date(2026, 6, 30),
+            "total_payment": 2000000,
+            "bank": "하나은행", "account": "111",
+        },
+    }
+    giganje_rows = [
+        {
+            "소속": "부산지방고용노동청", "직급": "기간제근로자", "성명": "최도영",
+            "생년월일": datetime(1998, 1, 26),  # 문자열이 아니라 실제 datetime 객체
+            "종별": "결근", "사용기간(날짜)": "2026-06-29", "사용시간(시분)": None,
+        },
+    ]
+    departed = departed_retroactive({}, previous_payroll, giganje_rows, _config(), 2026, 6)
+    assert len(departed) == 1, f"datetime 셀 때문에 매칭 실패(버그 재현): {departed}"
+    print("OK: test_departed_person_matches_when_birth_cell_is_a_real_date")
+
+
 if __name__ == "__main__":
     test_departed_person_with_leftover_rows_is_recalculated()
     test_departed_person_with_no_leftover_rows_is_skipped()
     test_departed_person_name_collision_with_different_birth_is_ignored()
     test_compute_retroactive_combines_both()
+    test_departed_person_matches_when_birth_cell_is_a_real_date()
     print("ALL OK")
