@@ -78,8 +78,33 @@ def test_reassigned_contract_does_not_cause_full_clawback():
     print("OK: test_reassigned_contract_does_not_cause_full_clawback")
 
 
+def test_blank_previous_contract_dates_skip_that_person_only():
+    """전월 파일이 수기로 편집되는 등 계약일자 셀이 비어있으면(None) 그
+    사람만 소급 0으로 건너뛰어야 한다 - 여기서 예외가 나면 이 함수를
+    감싸는 app.py의 단일 try/except 때문에 전원의 소급계산이 통째로
+    사라지는 더 나쁜 회귀가 생긴다."""
+    person = TargetPerson(
+        name="김철수", birth="19900101", ssn="900101-1234567", bank="", account="",
+        survey_name="테스트조사", contract_start=date(2026, 6, 1), contract_end=date(2026, 6, 30),
+        events=[],
+    )
+    people = {person_key("김철수", "19900101"): person}
+    previous_payroll = {
+        "900101-1234567": {
+            "ssn": "900101-1234567", "name": "김철수",
+            "contract_start": None, "contract_end": None,  # 수기 편집 등으로 비어있는 경우
+            "total_payment": 1000000,
+            "bank": "", "account": "",
+        },
+    }
+    adjustments = current_month_adjustments(people, previous_payroll, _config(), 2026, 6)
+    assert adjustments[person_key("김철수", "19900101")] == 0
+    print("OK: test_blank_previous_contract_dates_skip_that_person_only")
+
+
 if __name__ == "__main__":
     test_adjustment_is_recalculated_minus_previously_paid()
     test_no_previous_entry_means_zero_adjustment()
     test_reassigned_contract_does_not_cause_full_clawback()
+    test_blank_previous_contract_dates_skip_that_person_only()
     print("ALL OK")

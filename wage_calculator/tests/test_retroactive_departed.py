@@ -106,10 +106,32 @@ def test_departed_person_matches_when_birth_cell_is_a_real_date():
     print("OK: test_departed_person_matches_when_birth_cell_is_a_real_date")
 
 
+def test_departed_person_blank_contract_dates_is_skipped_not_crashed():
+    """전월 파일의 계약일자 셀이 비어있으면(None) 예외 없이 건너뛰어야 한다."""
+    previous_payroll = {
+        "980126-2641395": {
+            "ssn": "980126-2641395", "name": "최도영",
+            "contract_start": None, "contract_end": None,
+            "total_payment": 2000000, "bank": "", "account": "",
+        },
+    }
+    giganje_rows = [
+        {
+            "소속": "부산지방고용노동청", "직급": "기간제근로자", "성명": "최도영",
+            "생년월일": "1998-01-26", "종별": "결근",
+            "사용기간(날짜)": "2026-06-29", "사용시간(시분)": None,
+        },
+    ]
+    departed = departed_retroactive({}, previous_payroll, giganje_rows, _config(), 2026, 6)
+    assert departed == [], departed
+    print("OK: test_departed_person_blank_contract_dates_is_skipped_not_crashed")
+
+
 if __name__ == "__main__":
     test_departed_person_with_leftover_rows_is_recalculated()
     test_departed_person_with_no_leftover_rows_is_skipped()
     test_departed_person_name_collision_with_different_birth_is_ignored()
     test_compute_retroactive_combines_both()
     test_departed_person_matches_when_birth_cell_is_a_real_date()
+    test_departed_person_blank_contract_dates_is_skipped_not_crashed()
     print("ALL OK")

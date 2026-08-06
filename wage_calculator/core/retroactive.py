@@ -36,6 +36,13 @@ def current_month_adjustments(people, previous_payroll, config, prev_year, prev_
         if prev is None:
             adjustments[key] = 0
             continue
+        if prev["contract_start"] is None or prev["contract_end"] is None:
+            # 전월 파일이 수기로 편집되는 등 계약일자 셀이 비어있으면 그 사람만
+            # 건너뛴다(소급 0) - 여기서 계속 진행해 예외를 던지면 이 함수를
+            # 감싸는 app.py의 단일 try/except 때문에 전원의 소급계산이
+            # 통째로 날아간다.
+            adjustments[key] = 0
+            continue
         temp_person = TargetPerson(
             name=person.name, birth=person.birth, ssn=person.ssn,
             bank=person.bank, account=person.account,
@@ -84,6 +91,10 @@ def departed_retroactive(people, previous_payroll, giganje_rows, config, prev_ye
             and _row_birth_matches(row, expected_birth)
         ]
         if not matched_rows:
+            continue
+        if prev["contract_start"] is None or prev["contract_end"] is None:
+            # current_month_adjustments와 동일한 이유로, 계약일자가 비어있는
+            # 사람만 건너뛴다(전체 소급계산이 죽는 것을 막기 위함).
             continue
 
         temp_person = TargetPerson(
