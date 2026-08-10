@@ -80,3 +80,4 @@
 - **main.py 부트스트랩**: frozen 상태로 실행될 때 `WEBVIEW2_BROWSER_EXECUTABLE_FOLDER` 환경변수를 exe와 같은 폴더 내 런타임 경로로 지정한 뒤 pywebview 창을 연다.
 - **새 의존성**: `fastapi`, `uvicorn`, `pywebview`, `jinja2`. 현재 없는 `requirements.txt`를 신설한다. PyInstaller `hiddenimports`에 `uvicorn`과 `pywebview`의 플랫폼별 백엔드 모듈을 명시적으로 추가한다(둘 다 동적 임포트를 사용해 PyInstaller가 자동으로 못 찾는 경우가 있음).
 - **버전 네이밍**: 아키텍처 대규모 변경이므로 `통계조사관임금계산_v4.2` → `v5.0`으로 올린다.
+- **예시 파일 동봉**: `demo_assets/`에 A(개인정보)·B(근무상황)·전월 임금내역 3종 예시 파일을 배포 폴더에 함께 넣는다. A/B 예시는 실제 직원 정보가 아닌 **가상 인물 5명의 더미 데이터**로 새로 만든다(주민번호·계좌번호 등은 전부 가짜 값). B 예시에는 특별휴가 마킹 화면까지 시연되도록 "특별휴가" 종별 건을 하나 포함한다. `datas`에 `demo_assets/`를 등록해 onedir 폴더 안에 그대로 복사되게 한다.
