@@ -12,7 +12,7 @@ from core.retroactive import current_month_adjustments
 
 def _config():
     return Config({"surveys": [], "rates": {
-        "2026": {"hourly_wage": 9820, "meal_allowance": 160000},
+        "2026": {"daily_wage": 78560, "meal_allowance": 160000},
     }, "holidays": []})
 
 

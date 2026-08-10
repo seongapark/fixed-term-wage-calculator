@@ -135,4 +135,13 @@ def build_wage_sheet(wb, results, seq_start=1, retro_adjustments=None):
         for r_ in range(DATA_START_ROW, row):
             ws.cell(row=r_, column=col).number_format = "yyyy-mm-dd"
 
+    money_cols = (
+        COL["daily_wage"], COL["gross_pay"], COL["late_out_deduction"], COL["base_pay"],
+        COL["weekly_holiday_pay"], COL["meal_allowance"], COL["leave_compensation"],
+        COL["total_payment"], COL["retro_adjustment"], COL["final_payment"],
+    )
+    for col in money_cols:
+        for r_ in range(DATA_START_ROW, row):
+            ws.cell(row=r_, column=col).number_format = "#,##0"
+
     return ws

@@ -19,8 +19,8 @@ def _person(contract_start, contract_end):
 
 def test_calc_payroll_uses_rate_for_requested_year():
     config = Config({"surveys": [], "rates": {
-        "2025": {"hourly_wage": 9860, "meal_allowance": 150000},
-        "2026": {"hourly_wage": 9820, "meal_allowance": 160000},
+        "2025": {"daily_wage": 9860 * 8, "meal_allowance": 150000},
+        "2026": {"daily_wage": 9820 * 8, "meal_allowance": 160000},
     }, "holidays": []})
 
     person_2025 = _person(date(2025, 12, 1), date(2025, 12, 31))
@@ -35,7 +35,7 @@ def test_calc_payroll_uses_rate_for_requested_year():
 
 
 def test_calc_payroll_raises_when_year_rate_missing():
-    config = Config({"surveys": [], "rates": {"2026": {"hourly_wage": 9820, "meal_allowance": 160000}}, "holidays": []})
+    config = Config({"surveys": [], "rates": {"2026": {"daily_wage": 9820 * 8, "meal_allowance": 160000}}, "holidays": []})
     person = _person(date(2025, 12, 1), date(2025, 12, 31))
     try:
         calc_payroll(person, config, 2025, 12)

@@ -54,7 +54,7 @@ class ConfirmRunDialog(tk.Toplevel):
         else:
             text.insert("end", f"[이번 달({year}년 {month}월) 공휴일 없음]\n\n")
 
-        text.insert("end", f"[현재 적용 요율({year}년)]\n시급: {app.config_obj.hourly_wage_for(year):,}원 / 월 식대: {app.config_obj.meal_allowance_for(year):,}원\n\n")
+        text.insert("end", f"[현재 적용 요율({year}년)]\n일급: {app.config_obj.daily_wage_for(year):,}원 / 월 식대: {app.config_obj.meal_allowance_for(year):,}원\n\n")
 
         overridden = [p.name for p in app.people.values() if p.contract_overridden]
         if overridden:

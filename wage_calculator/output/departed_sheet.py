@@ -45,6 +45,11 @@ def build_departed_sheet(wb, departed_results):
         ws.cell(row=row, column=COL["prev_paid"], value=d.prev_paid)
         ws.cell(row=row, column=COL["adjustment"], value=d.adjustment)
         row += 1
+
+    for col in (COL["prev_recalculated"], COL["prev_paid"], COL["adjustment"]):
+        for r_ in range(DATA_START_ROW, row):
+            ws.cell(row=r_, column=col).number_format = "#,##0"
+
     return ws
 
 
@@ -67,4 +72,9 @@ def build_departed_evidence_sheet(wb, departed_results):
         paid_addr = f"{get_column_letter(EVIDENCE_COL['prev_paid'])}{row}"
         ws.cell(row=row, column=EVIDENCE_COL["adjustment"], value=f"={recalc_addr}-{paid_addr}")
         row += 1
+
+    for col in (EVIDENCE_COL["prev_recalculated"], EVIDENCE_COL["prev_paid"], EVIDENCE_COL["adjustment"]):
+        for r_ in range(DATA_START_ROW, row):
+            ws.cell(row=r_, column=col).number_format = "#,##0"
+
     return ws

@@ -5,6 +5,7 @@ from tkinter import messagebox, ttk
 from core.parser import display_label, person_key
 from core.paths import downloads_dir
 from output.build import build_workbook, build_departed_workbook, output_filename, departed_output_filename
+from .tree_utils import autosize_columns
 
 
 class ResultScreen(ttk.Frame):
@@ -14,15 +15,15 @@ class ResultScreen(ttk.Frame):
 
         ttk.Label(self, text="계산 결과", font=("", 14, "bold")).pack(pady=(16, 8))
 
-        columns = ("name", "survey", "period", "total_days", "weekly", "remain_leave", "total_pay")
-        headers = {
+        self.columns = ("name", "survey", "period", "total_days", "weekly", "remain_leave", "total_pay")
+        self.headers = {
             "name": "성명", "survey": "조사", "period": "급여계산기간",
             "total_days": "계(일)", "weekly": "주휴(일)", "remain_leave": "잔여연가(일)",
             "total_pay": "지급총액",
         }
-        self.tree = ttk.Treeview(self, columns=columns, show="headings", height=16)
-        for c in columns:
-            self.tree.heading(c, text=headers[c])
+        self.tree = ttk.Treeview(self, columns=self.columns, show="headings", height=16)
+        for c in self.columns:
+            self.tree.heading(c, text=self.headers[c])
             self.tree.column(c, width=110, anchor="center")
         self.tree.pack(fill="both", expand=True, padx=10, pady=6)
         self.tree.bind("<Double-1>", self._open_evidence)
@@ -47,6 +48,7 @@ class ResultScreen(ttk.Frame):
                 r.total_days, r.weekly_holiday_days, round(r.remaining_leave_days, 2),
                 f"{r.total_payment:,}",
             ))
+        autosize_columns(self.tree, self.columns, self.headers)
 
     def _open_evidence(self, _evt=None):
         sel = self.tree.selection()

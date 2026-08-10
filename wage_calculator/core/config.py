@@ -6,7 +6,7 @@ from .paths import config_path
 
 DEFAULT_CONFIG = {
     "surveys": [],       # [{"name": str, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}]
-    "rates": {},          # {"2026": {"hourly_wage": 9820, "meal_allowance": 160000}, ...}
+    "rates": {},          # {"2026": {"daily_wage": 78560, "meal_allowance": 160000}, ...}
     "holidays": []        # ["YYYY-MM-DD", ...]
 }
 
@@ -25,7 +25,7 @@ class Config:
             # 레거시 config.json(단일 공통입력값) 마이그레이션: 현재 연도로 1회 이전.
             legacy = data["common"]
             self.rates[str(date.today().year)] = {
-                "hourly_wage": legacy.get("hourly_wage", 0),
+                "daily_wage": legacy.get("daily_wage", legacy.get("hourly_wage", 0)),
                 "meal_allowance": legacy.get("meal_allowance", 0),
             }
         self.holidays = sorted(set(data.get("holidays", [])))
@@ -67,8 +67,8 @@ class Config:
         return [h for h in self.holidays if start <= h <= end]
 
     # ---- 연도별 요율 ----
-    def set_year_rates(self, year: int, hourly_wage: int, meal_allowance: int):
-        self.rates[str(year)] = {"hourly_wage": hourly_wage, "meal_allowance": meal_allowance}
+    def set_year_rates(self, year: int, daily_wage: int, meal_allowance: int):
+        self.rates[str(year)] = {"daily_wage": daily_wage, "meal_allowance": meal_allowance}
 
     def delete_year_rates(self, year: int):
         self.rates.pop(str(year), None)
@@ -76,16 +76,16 @@ class Config:
     def rate_years(self):
         return sorted(int(y) for y in self.rates.keys())
 
-    def hourly_wage_for(self, year: int) -> int:
+    def daily_wage_for(self, year: int) -> int:
         y = str(year)
-        if y not in self.rates:
-            raise ValueError(f"{year}년 시급/식대 요율이 설정되지 않았습니다. 설정 화면에서 추가하세요.")
-        return self.rates[y]["hourly_wage"]
+        if y not in self.rates or "daily_wage" not in self.rates[y]:
+            raise ValueError(f"{year}년 일급/식대 요율이 설정되지 않았습니다. 설정 화면에서 추가하세요.")
+        return self.rates[y]["daily_wage"]
 
     def meal_allowance_for(self, year: int) -> int:
         y = str(year)
         if y not in self.rates:
-            raise ValueError(f"{year}년 시급/식대 요율이 설정되지 않았습니다. 설정 화면에서 추가하세요.")
+            raise ValueError(f"{year}년 일급/식대 요율이 설정되지 않았습니다. 설정 화면에서 추가하세요.")
         return self.rates[y]["meal_allowance"]
 
     # ---- 저장/불러오기 ----

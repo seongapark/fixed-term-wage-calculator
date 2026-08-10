@@ -13,7 +13,7 @@ from output.evidence_sheet import build_evidence_sheet, COL
 
 
 def _config():
-    return Config({"surveys": [], "rates": {"2026": {"hourly_wage": 9820, "meal_allowance": 160000}}, "holidays": []})
+    return Config({"surveys": [], "rates": {"2026": {"daily_wage": 78560, "meal_allowance": 160000}}, "holidays": []})
 
 
 def _result():
@@ -38,10 +38,10 @@ def test_formula_cells_reference_same_row_inputs():
     ws = build_evidence_sheet(wb, [result], _config(), retro_adjustments={key: -10000})
 
     row = 2  # DATA_START_ROW
-    assert ws.cell(row=row, column=COL["hourly_wage"]).value == 9820
-    assert ws.cell(row=row, column=COL["daily_wage"]).value == "=ROUNDDOWN(C2*8,0)"
+    assert ws.cell(row=row, column=COL["daily_wage_input"]).value == 78560
+    assert ws.cell(row=row, column=COL["daily_wage"]).value == "=C2"
     assert ws.cell(row=row, column=COL["gross_pay"]).value == "=L2*D2"
-    assert ws.cell(row=row, column=COL["late_out_deduction"]).value == "=ROUNDDOWN(C2/60*E2,-1)"
+    assert ws.cell(row=row, column=COL["late_out_deduction"]).value == "=ROUNDDOWN(C2/8/60*E2,-1)"
     assert ws.cell(row=row, column=COL["base_pay"]).value == "=ROUNDDOWN(N2-O2,-1)"
     assert ws.cell(row=row, column=COL["total_payment"]).value == "=ROUNDDOWN(P2+Q2+R2+S2,-1)"
     # retro_details가 없으면(전월파일이 없거나 이 사람은 전월파일에 없는 경우)

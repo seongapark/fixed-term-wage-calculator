@@ -11,7 +11,7 @@ from core.models import build_event, LeaveEvent
 
 
 def _config():
-    return Config({"surveys": [], "rates": {"2026": {"hourly_wage": 9820, "meal_allowance": 160000}}, "holidays": []})
+    return Config({"surveys": [], "rates": {"2026": {"daily_wage": 78560, "meal_allowance": 160000}}, "holidays": []})
 
 
 def _person(events):

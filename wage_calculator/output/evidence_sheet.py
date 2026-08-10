@@ -13,7 +13,7 @@ DATA_START_ROW = 2
 
 COL = {
     "seq": 1, "name": 2,
-    "hourly_wage": 3, "total_days": 4, "late_out_minutes": 5, "weekly_holiday_days": 6,
+    "daily_wage_input": 3, "total_days": 4, "late_out_minutes": 5, "weekly_holiday_days": 6,
     "meal_allowance_rate": 7, "calendar_month_days": 8, "meal_eligible_days": 9,
     "remaining_leave_days": 10, "is_final_month": 11,
     "daily_wage": 12, "daily_meal": 13, "gross_pay": 14, "late_out_deduction": 15,
@@ -23,7 +23,7 @@ COL = {
 }
 
 HEADERS = {
-    "seq": "순번", "name": "성명", "hourly_wage": "시급", "total_days": "계(일)",
+    "seq": "순번", "name": "성명", "daily_wage_input": "일급(설정값)", "total_days": "계(일)",
     "late_out_minutes": "조퇴외출(분)", "weekly_holiday_days": "주휴(일)",
     "meal_allowance_rate": "월식대", "calendar_month_days": "월력상",
     "meal_eligible_days": "식대해당일", "remaining_leave_days": "잔여연가(일)",
@@ -68,7 +68,7 @@ def build_evidence_sheet(wb, results, config, retro_adjustments=None, retro_deta
         ws.cell(row=row, column=COL["name"], value=r.name)
 
         # 입력값(고정값): 이미 파이썬에서 계산된 값을 그대로 적어 넣는다.
-        ws.cell(row=row, column=COL["hourly_wage"], value=config.hourly_wage_for(r.period_start.year))
+        ws.cell(row=row, column=COL["daily_wage_input"], value=config.daily_wage_for(r.period_start.year))
         ws.cell(row=row, column=COL["total_days"], value=r.total_days)
         ws.cell(row=row, column=COL["late_out_minutes"], value=r.late_out_minutes)
         ws.cell(row=row, column=COL["weekly_holiday_days"], value=r.weekly_holiday_days)
@@ -80,13 +80,13 @@ def build_evidence_sheet(wb, results, config, retro_adjustments=None, retro_deta
 
         # 수식 셀: 같은 행의 입력값 셀을 참조하는 실제 엑셀 ROUNDDOWN 수식.
         ws.cell(row=row, column=COL["daily_wage"],
-                value=f"=ROUNDDOWN({_addr(row,'hourly_wage')}*8,0)")
+                value=f"={_addr(row,'daily_wage_input')}")
         ws.cell(row=row, column=COL["daily_meal"],
                 value=f"=ROUNDDOWN({_addr(row,'meal_allowance_rate')}/209*8,0)")
         ws.cell(row=row, column=COL["gross_pay"],
                 value=f"={_addr(row,'daily_wage')}*{_addr(row,'total_days')}")
         ws.cell(row=row, column=COL["late_out_deduction"],
-                value=f"=ROUNDDOWN({_addr(row,'hourly_wage')}/60*{_addr(row,'late_out_minutes')},-1)")
+                value=f"=ROUNDDOWN({_addr(row,'daily_wage_input')}/8/60*{_addr(row,'late_out_minutes')},-1)")
         ws.cell(row=row, column=COL["base_pay"],
                 value=f"=ROUNDDOWN({_addr(row,'gross_pay')}-{_addr(row,'late_out_deduction')},-1)")
         ws.cell(row=row, column=COL["weekly_holiday_pay"],
@@ -117,4 +117,15 @@ def build_evidence_sheet(wb, results, config, retro_adjustments=None, retro_deta
                 value=f"={_addr(row,'total_payment')}+{_addr(row,'retro_adjustment')}")
 
         row += 1
+
+    money_cols = (
+        COL["daily_wage_input"], COL["meal_allowance_rate"], COL["daily_wage"], COL["daily_meal"],
+        COL["gross_pay"], COL["late_out_deduction"], COL["base_pay"], COL["weekly_holiday_pay"],
+        COL["meal_allowance"], COL["leave_compensation"], COL["total_payment"],
+        COL["retro_recalculated"], COL["retro_prev_paid"], COL["retro_adjustment"], COL["final_payment"],
+    )
+    for col in money_cols:
+        for r_ in range(DATA_START_ROW, row):
+            ws.cell(row=r_, column=col).number_format = "#,##0"
+
     return ws

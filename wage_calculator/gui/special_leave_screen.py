@@ -7,6 +7,7 @@
 from tkinter import messagebox, ttk
 
 from core import date_utils
+from .tree_utils import autosize_columns
 
 
 def collect_pending_groups(people):
@@ -78,11 +79,11 @@ class SpecialLeaveScreen(ttk.Frame):
             foreground="gray", justify="left",
         ).pack(pady=(0, 8))
 
-        columns = ("name", "period", "reason", "note", "status")
-        headers = {"name": "성명", "period": "기간", "reason": "사유(원본)", "note": "비고(원본)", "status": "유급/무급"}
-        self.tree = ttk.Treeview(self, columns=columns, show="headings", height=14)
-        for c in columns:
-            self.tree.heading(c, text=headers[c])
+        self.columns = ("name", "period", "reason", "note", "status")
+        self.headers = {"name": "성명", "period": "기간", "reason": "사유(원본)", "note": "비고(원본)", "status": "유급/무급"}
+        self.tree = ttk.Treeview(self, columns=self.columns, show="headings", height=14)
+        for c in self.columns:
+            self.tree.heading(c, text=self.headers[c])
             self.tree.column(c, width=140 if c in ("reason", "note") else 100, anchor="center")
         self.tree.pack(fill="both", expand=True, padx=10, pady=6)
         self.tree.bind("<Button-1>", self._on_click)
@@ -103,6 +104,7 @@ class SpecialLeaveScreen(ttk.Frame):
             self.tree.insert("", "end", iid=str(idx), values=(
                 g["person_name"], period, reason, note, STATUS_LABEL[g["status"]],
             ))
+        autosize_columns(self.tree, self.columns, self.headers)
         all_decided = all(g["status"] is not None for g in self.groups)
         self.next_btn.config(state="normal" if all_decided else "disabled")
 

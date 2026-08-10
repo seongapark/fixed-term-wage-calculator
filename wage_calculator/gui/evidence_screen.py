@@ -5,6 +5,7 @@ from tkinter import ttk
 from core import date_utils, leave_engine
 from core.leave_engine import leave_usage_minutes
 from core.parser import display_label, person_key
+from .tree_utils import autosize_columns
 
 
 class EvidenceScreen(ttk.Frame):
@@ -28,9 +29,9 @@ class EvidenceScreen(ttk.Frame):
         raw_frame = ttk.Frame(paned)
         paned.add(raw_frame, weight=1)
         ttk.Label(raw_frame, text="근무현황 원본(B파일)", font=("", 10, "bold")).pack(anchor="w", pady=(0, 4))
-        raw_columns = ["종별", "사용기간(날짜)", "사용시간(시분)", "사유", "비고"]
-        self.raw_tree = ttk.Treeview(raw_frame, columns=raw_columns, show="headings", height=20)
-        for c in raw_columns:
+        self.raw_columns = ["종별", "사용기간(날짜)", "사용시간(시분)", "사유", "비고"]
+        self.raw_tree = ttk.Treeview(raw_frame, columns=self.raw_columns, show="headings", height=20)
+        for c in self.raw_columns:
             self.raw_tree.heading(c, text=c)
             self.raw_tree.column(c, width=100, anchor="center")
         self.raw_tree.pack(fill="both", expand=True)
@@ -57,6 +58,7 @@ class EvidenceScreen(ttk.Frame):
             tree.heading(c, text=c)
             tree.column(c, width=90, anchor="center")
         tree.pack(fill="both", expand=True, padx=6, pady=6)
+        tree.tab_columns = columns
         return tree
 
     def refresh(self, selected_key=None):
@@ -140,3 +142,7 @@ class EvidenceScreen(ttk.Frame):
         self.leave_tree.insert("", "end", values=(
             "", "", "", "최종", "", f"{round(r.remaining_leave_days,4)}일", round(r.remaining_leave_days * 480),
         ))
+
+        autosize_columns(self.raw_tree, self.raw_columns)
+        for tree in (self.weekly_tree, self.lateout_tree, self.meal_tree, self.leave_tree):
+            autosize_columns(tree, tree.tab_columns)

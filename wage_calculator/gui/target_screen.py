@@ -4,6 +4,7 @@ from datetime import date
 from tkinter import messagebox, ttk
 
 from core.parser import display_label
+from .tree_utils import autosize_columns
 
 
 class ContractEditDialog(tk.Toplevel):
@@ -54,11 +55,11 @@ class TargetScreen(ttk.Frame):
         ttk.Entry(top, textvariable=self.month_var, width=4).pack(side="left", padx=(2, 12))
 
 
-        columns = ("check", "name", "survey", "start", "end")
-        self.tree = ttk.Treeview(self, columns=columns, show="headings", height=14)
-        headers = {"check": "선택", "name": "성명", "survey": "담당조사", "start": "계약시작", "end": "계약마지막"}
-        for c in columns:
-            self.tree.heading(c, text=headers[c])
+        self.columns = ("check", "name", "survey", "start", "end")
+        self.tree = ttk.Treeview(self, columns=self.columns, show="headings", height=14)
+        self.headers = {"check": "선택", "name": "성명", "survey": "담당조사", "start": "계약시작", "end": "계약마지막"}
+        for c in self.columns:
+            self.tree.heading(c, text=self.headers[c])
             self.tree.column(c, width=110 if c != "name" else 90, anchor="center")
         self.tree.pack(fill="both", expand=True, padx=10, pady=6)
         self.tree.bind("<Button-1>", self._on_click)
@@ -97,6 +98,7 @@ class TargetScreen(ttk.Frame):
                 person.contract_start.isoformat() if person.contract_start else "",
                 person.contract_end.isoformat() if person.contract_end else "",
             ))
+        autosize_columns(self.tree, self.columns, self.headers)
 
     def _select_all(self):
         self.checked = set(self.app.people.keys())
