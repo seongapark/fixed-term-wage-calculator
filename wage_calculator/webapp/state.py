@@ -8,6 +8,7 @@ from core import date_utils
 from core.config import Config
 from core.parser import (
     build_target_people,
+    display_label,
     load_employees,
     load_giganje_rows,
     load_previous_payroll,
@@ -122,3 +123,52 @@ class AppState:
             g["status"] = status
             for e in g["events"]:
                 e.classified = status
+
+    def targets(self):
+        all_names = [p.name for p in self.people.values()]
+        out = []
+        for key, person in self.people.items():
+            out.append({
+                "key": key,
+                "label": display_label(person.name, person.birth, all_names),
+                "survey_name": person.survey_name or "",
+                "contract_start": person.contract_start.isoformat() if person.contract_start else "",
+                "contract_end": person.contract_end.isoformat() if person.contract_end else "",
+            })
+        return out
+
+    def survey_names(self):
+        return self.config_obj.survey_names()
+
+    def batch_assign(self, keys, survey_name):
+        survey = self.config_obj.get_survey(survey_name)
+        if survey is None:
+            raise ValueError(f"등록되지 않은 담당조사입니다: {survey_name}")
+        start = date_utils.parse_date(survey["start"])
+        end = date_utils.parse_date(survey["end"])
+        for key in keys:
+            person = self.people[key]
+            person.survey_name = survey_name
+            person.contract_start = start
+            person.contract_end = end
+            person.contract_overridden = False
+
+    def edit_contract(self, key, start, end):
+        person = self.people[key]
+        person.contract_start = date_utils.parse_date(start)
+        person.contract_end = date_utils.parse_date(end)
+        person.contract_overridden = True
+
+    def prepare_calculation(self, year, month):
+        """대상자 확인 화면의 '계산 실행' 검증. 통과하면 work_year/work_month를
+        세팅하고 담당조사 미지정 인원 명단을 돌려준다(경고 표시용, 차단은 아님)."""
+        if self.ambiguous_names:
+            raise ValueError(
+                "동명이인을 구분할 수 없는 대상자가 있어 계산을 진행할 수 없습니다: "
+                + ", ".join(self.ambiguous_names)
+            )
+        if not (1 <= month <= 12):
+            raise ValueError("급여산정 연/월을 올바르게 입력하세요.")
+        self.work_year = year
+        self.work_month = month
+        return [p.name for p in self.people.values() if not p.survey_name]
