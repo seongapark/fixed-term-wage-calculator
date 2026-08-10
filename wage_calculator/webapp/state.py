@@ -97,3 +97,28 @@ class AppState:
             "ambiguous_names": list(self.ambiguous_names),
             "has_pending_special_leave": bool(self.pending_leave_groups),
         }
+
+    def special_leave_groups(self):
+        out = []
+        for idx, g in enumerate(self.pending_leave_groups):
+            reason, note = _find_reason_note(self.giganje_rows, g["person_name"], g["start"], g["end"])
+            out.append({
+                "index": idx,
+                "person_name": g["person_name"],
+                "start": g["start"].isoformat(),
+                "end": g["end"].isoformat(),
+                "reason": reason,
+                "note": note,
+                "status": g["status"],
+            })
+        return out
+
+    def confirm_special_leave(self, statuses):
+        if len(statuses) != len(self.pending_leave_groups):
+            raise ValueError("특별휴가 상태 값 개수가 대기 중인 건수와 맞지 않습니다.")
+        if any(not s for s in statuses):
+            raise ValueError("모든 건에 유급/무급을 지정해야 진행할 수 있습니다.")
+        for g, status in zip(self.pending_leave_groups, statuses):
+            g["status"] = status
+            for e in g["events"]:
+                e.classified = status
