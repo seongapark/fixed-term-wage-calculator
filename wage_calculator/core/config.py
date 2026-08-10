@@ -29,6 +29,7 @@ class Config:
                 "meal_allowance": legacy.get("meal_allowance", 0),
             }
         self.holidays = sorted(set(data.get("holidays", [])))
+        self.last_upload_dir = str(data.get("last_upload_dir", ""))
 
     # ---- 조사종류 ----
     def add_or_update_survey(self, name: str, start: str, end: str):
@@ -66,6 +67,10 @@ class Config:
         start, end = _iso(start), _iso(end)
         return [h for h in self.holidays if start <= h <= end]
 
+    # ---- 파일 선택 경로 ----
+    def set_last_upload_dir(self, path: str):
+        self.last_upload_dir = path
+
     # ---- 연도별 요율 ----
     def set_year_rates(self, year: int, daily_wage: int, meal_allowance: int):
         self.rates[str(year)] = {"daily_wage": daily_wage, "meal_allowance": meal_allowance}
@@ -90,7 +95,12 @@ class Config:
 
     # ---- 저장/불러오기 ----
     def to_dict(self):
-        return {"surveys": self.surveys, "rates": self.rates, "holidays": self.holidays}
+        return {
+            "surveys": self.surveys,
+            "rates": self.rates,
+            "holidays": self.holidays,
+            "last_upload_dir": self.last_upload_dir,
+        }
 
     def save(self):
         path = config_path()
