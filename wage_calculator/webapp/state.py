@@ -18,6 +18,10 @@ from core.parser import (
 from core.payroll import calc_payroll
 from core.retroactive import compute_retroactive
 
+from core import leave_engine
+from core.leave_engine import leave_usage_minutes
+from core.parser import person_key
+
 
 def collect_pending_groups(people):
     """people(dict[key, TargetPerson]) 전체에서 classified == "특별휴가_미정"인
@@ -220,3 +224,116 @@ class AppState:
             except Exception as e:
                 errors.append(f"소급계산 오류: {e}")
         return errors
+
+    def results_summary(self):
+        all_names = [r.name for r in self.results]
+        out = []
+        for r in self.results:
+            out.append({
+                "key": person_key(r.name, r.birth),
+                "label": display_label(r.name, r.birth, all_names),
+                "survey": r.survey_name,
+                "period": f"{r.period_start.isoformat()}~{r.period_end.isoformat()}",
+                "total_days": r.total_days,
+                "weekly_holiday_days": r.weekly_holiday_days,
+                "remaining_leave_days": round(r.remaining_leave_days, 2),
+                "total_payment": r.total_payment,
+            })
+        return out
+
+    def evidence_names(self):
+        all_names = [r.name for r in self.results]
+        return [
+            {"key": person_key(r.name, r.birth), "label": display_label(r.name, r.birth, all_names)}
+            for r in self.results
+        ]
+
+    def _result_by_key(self, key):
+        for r in self.results:
+            if person_key(r.name, r.birth) == key:
+                return r
+        return None
+
+    def evidence_for(self, key):
+        result = self._result_by_key(key)
+        if result is None:
+            return None
+
+        raw_rows = []
+        for row in self.giganje_rows:
+            if row["성명"] != result.name:
+                continue
+            if str(row.get("생년월일") or "").strip() != result.birth:
+                continue
+            raw_rows.append({
+                "category": row.get("종별") or "",
+                "period": row.get("사용기간(날짜)") or "",
+                "time": row.get("사용시간(시분)") or "",
+                "reason": row.get("사유") or "",
+                "note": row.get("비고") or "",
+            })
+
+        weekly = [{
+            "index": w.index,
+            "start": w.start.isoformat(),
+            "effective_end": w.effective_end.isoformat(),
+            "workdays": w.workdays,
+            "absence_days": w.absence_days,
+            "public_leave_days": w.public_leave_days,
+            "sick_full_days": w.sick_full_days,
+            "granted": w.granted,
+            "reason": w.reason,
+        } for w in result.weekly_windows]
+
+        late_out = [{
+            "date": e.d.isoformat(),
+            "category": e.raw_category,
+            "start": e.time_start.strftime("%H:%M"),
+            "end": e.time_end.strftime("%H:%M"),
+            "lunch_included": "포함" if (e.time_start < date_utils.LUNCH_START and e.time_end > date_utils.LUNCH_END) else "미포함",
+            "minutes": e.minutes,
+        } for e in result.late_out_events]
+
+        total_days = (result.period_end - result.period_start).days + 1
+        meal = {
+            "period_start": result.period_start.isoformat(),
+            "period_end": result.period_end.isoformat(),
+            "total_days": total_days,
+            "absence_days": result.absence_days,
+            "meal_eligible_days": result.meal_eligible_days,
+        }
+
+        leave_rows = []
+        for w in result.monthly_windows:
+            if w.start > result.period_end:
+                continue
+            usage_text = ", ".join(
+                f"{e.d.strftime('%m-%d')}:{leave_usage_minutes(e)}" for e in w.usage_events
+            )
+            concluded = w.effective_end <= result.period_end
+            status = ("만근" if w.full_attendance else ("기간중 종료" if w.truncated else "미만근")) if concluded else "진행중"
+            as_of = min(w.effective_end, result.period_end)
+            balance_at_row = leave_engine.leave_balance_minutes_as_of(result.monthly_windows, as_of)
+            leave_rows.append({
+                "index": w.index,
+                "start": w.start.isoformat(),
+                "effective_end": w.effective_end.isoformat(),
+                "status": status,
+                "accrued": (1 if w.accrued else 0) if concluded else 0,
+                "usage": usage_text,
+                "balance_minutes": balance_at_row,
+            })
+        leave_final = {
+            "remaining_leave_days": round(result.remaining_leave_days, 4),
+            "remaining_leave_minutes": round(result.remaining_leave_days * 480),
+        }
+
+        return {
+            "raw_rows": raw_rows,
+            "weekly": weekly,
+            "late_out": late_out,
+            "late_out_total_minutes": result.late_out_minutes,
+            "meal": meal,
+            "leave": leave_rows,
+            "leave_final": leave_final,
+        }
