@@ -46,19 +46,30 @@
 | 현재 화면 | 새 API | 비고 |
 |---|---|---|
 | UploadScreen | `POST /api/upload` | A/B/전월 파일 선택은 `js_api.pick_file()`로 OS 네이티브 다이얼로그 사용. 마지막 사용 경로 기억(§5) |
-| SpecialLeaveScreen | `GET /api/special-leave`, `POST /api/special-leave/confirm` | 상태 토글(미정→유급→무급)은 클라이언트에서 처리, "다음" 클릭 시 한 번에 서버 전송 |
+| SpecialLeaveScreen | `GET /api/special-leave`, `POST /api/special-leave/confirm` | 상태 토글(미정→유급→무급)은 클라이언트에서 처리, "다음" 클릭 시 한 번에 서버 전송. 안내 아이콘(§5-1) 포함 |
 | TargetScreen + ContractEditDialog | `GET /api/targets`, `POST /api/targets/batch-assign`, `POST /api/targets/contract-edit`, `POST /api/targets/proceed` | 체크박스 선택은 클라이언트 상태로 관리. 더블클릭 시 계약기간 수정은 인라인 모달 |
 | ContractPeriodCheckDialog + ConfirmRunDialog | `GET /api/confirm-info`, `POST /api/calculate` | 2단계 확인 모달 유지(계약기간 확인 → 공휴일/요율/수정인원 안내 → 계산 실행) |
 | ResultScreen | `GET /api/results`, `POST /api/download` | 다운로드는 지금처럼 자동으로 다운로드 폴더에 저장 후 저장 경로를 토스트로 안내(저장 위치를 묻지 않는 현재 동작 유지) |
 | EvidenceScreen | `GET /api/evidence?key=` | 좌측 원본 B파일 표 + 우측 4개 탭(주휴/조퇴외출/식대/잔여연가)을 한 번의 호출로 받아 클라이언트에서 탭만 전환 |
 | SettingsDialog | `GET /api/settings`, `POST/DELETE /api/settings/survey`, `POST/DELETE /api/settings/rate`, `POST/DELETE /api/settings/holiday` | 조사종류/요율/공휴일 3개 탭 CRUD 유지, 앱 시작 시 자동으로 뜨는 동작 유지 |
 
-## 5. 신규 기능: 파일 선택 마지막 경로 기억
+## 5. 신규 기능
+
+### 5-1. 파일 선택 마지막 경로 기억
 
 - `Config`에 `last_upload_dir` 필드를 추가한다.
 - A/B/전월임금내역 세 버튼은 이 값을 **공유**한다 — 셋 중 어느 것으로든 파일을 성공적으로 고르면 그 폴더로 `last_upload_dir`를 갱신한다.
 - 다음 "찾아보기" 클릭 시 `js_api.pick_file()`이 이 경로를 시작 위치로 사용한다.
 - `config.json`에 함께 저장되므로 앱 재시작 후에도 유지된다.
+
+### 5-2. 특별휴가 유급/무급 참고표 (호버 패널)
+
+특별휴가 마킹 화면(§4 SpecialLeaveScreen)은 사람이 직접 판단해야 하는 유일한 화면이라, 판단 근거가 되는 내부망 "근무상황 종별 안내" 표를 화면에서 바로 참고할 수 있게 한다.
+
+- **배치**: 화면 상단(제목 옆)에 안내 아이콘(ⓘ) 1개.
+- **동작**: 아이콘에 마우스를 올리면 참고표 전체가 스크롤 가능한 패널로 뜬다. 마우스가 아이콘이나 패널 위에 있는 동안 유지되고, 둘 다 벗어나면 닫힌다. 표가 길기 때문에(연가/지각·외출·조퇴/경조사휴가/특별휴가 세부 15종/병가/공가/결근·기타) 작은 툴팁이 아니라 세로 스크롤이 있는 패널로 띄운다.
+- **데이터 출처**: 사용자가 내부망에서 캡처한 스크린샷 6장을 전사해 [`docs/superpowers/specs/reference/근무상황_종별_안내_전사.md`](reference/근무상황_종별_안내_전사.md)에 정리해 두었다. 구현 시 이 내용을 `webapp/static/reference/leave_category_guide.json`(또는 정적 HTML 파셜)로 옮겨 번들에 포함한다. **전사 내용은 스크린샷을 사람이 옮겨 적은 것이라 실제 반영 전에 원본과 한 번 대조 확인이 필요하다.**
+- **범위**: 이 표는 어디까지나 참고용이다 — 유급/무급 최종 판정은 지금처럼 담당자가 사유·비고란을 보고 직접 내린다(가족돌봄휴가처럼 유급/무급이 혼재된 항목도 있어 표 하나로 자동 판정할 수 없음). 자동 판정 로직에 연결하지 않는다.
 
 ## 6. 에러 처리 & 다이얼로그
 
