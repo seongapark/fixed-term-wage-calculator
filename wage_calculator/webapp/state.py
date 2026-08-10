@@ -4,6 +4,8 @@
 계산 흐름은 원본과 동일하게 유지하고, tkinter 위젯을 그리던 부분만 값을
 반환하도록 바뀐다.
 """
+from datetime import date
+
 from core import date_utils
 from core.config import Config
 from core.parser import (
@@ -13,6 +15,8 @@ from core.parser import (
     load_giganje_rows,
     load_previous_payroll,
 )
+from core.payroll import calc_payroll
+from core.retroactive import compute_retroactive
 
 
 def collect_pending_groups(people):
@@ -172,3 +176,47 @@ class AppState:
         self.work_year = year
         self.work_month = month
         return [p.name for p in self.people.values() if not p.survey_name]
+
+    def confirm_info(self):
+        year, month = self.work_year, self.work_month
+        month_first = date(year, month, 1)
+        month_last = date(year, month, date_utils.month_calendar_days(month_first))
+        holidays = self.config_obj.holidays_in_range(month_first.isoformat(), month_last.isoformat())
+        overridden = [p.name for p in self.people.values() if p.contract_overridden]
+        return {
+            "year": year,
+            "month": month,
+            "holidays": holidays,
+            "daily_wage": self.config_obj.daily_wage_for(year),
+            "meal_allowance": self.config_obj.meal_allowance_for(year),
+            "overridden_names": overridden,
+        }
+
+    def run_calculation(self):
+        targets = [p for p in self.people.values() if p.survey_name and p.contract_start and p.contract_end]
+        results = []
+        errors = []
+        for person in targets:
+            try:
+                results.append(calc_payroll(person, self.config_obj, self.work_year, self.work_month))
+            except Exception as e:
+                errors.append(f"{person.name}: {e}")
+        self.results = results
+
+        self.retro_adjustments = {}
+        self.retro_details = {}
+        self.departed_results = []
+        if self.previous_payroll:
+            prev_year, prev_month = date_utils.previous_month(self.work_year, self.work_month)
+            try:
+                retro = compute_retroactive(
+                    self.people, self.previous_payroll, self.giganje_rows,
+                    self.config_obj, prev_year, prev_month,
+                )
+                self.retro_adjustments = retro.adjustments
+                self.retro_details = retro.details
+                self.departed_results = retro.departed
+                errors.extend(retro.errors)
+            except Exception as e:
+                errors.append(f"소급계산 오류: {e}")
+        return errors
