@@ -5,8 +5,16 @@
 반환하도록 바뀐다.
 """
 from datetime import date
+from pathlib import Path
 
 from core import date_utils
+from core.paths import downloads_dir
+from output.build import (
+    build_departed_workbook,
+    build_workbook,
+    departed_output_filename,
+    output_filename,
+)
 from core.config import Config
 from core.parser import (
     build_target_people,
@@ -337,3 +345,22 @@ class AppState:
             "leave": leave_rows,
             "leave_final": leave_final,
         }
+
+    def download(self):
+        wb = build_workbook(
+            self.results, self.config_obj,
+            giganje_rows=self.giganje_rows,
+            retro_adjustments=self.retro_adjustments,
+            retro_details=self.retro_details,
+        )
+        filename = output_filename(self.work_year, self.work_month)
+        path = Path(downloads_dir()) / filename
+        wb.save(path)
+        saved = [str(path)]
+
+        if self.departed_results:
+            departed_wb = build_departed_workbook(self.departed_results)
+            departed_path = Path(downloads_dir()) / departed_output_filename(self.work_year, self.work_month)
+            departed_wb.save(departed_path)
+            saved.append(str(departed_path))
+        return saved
