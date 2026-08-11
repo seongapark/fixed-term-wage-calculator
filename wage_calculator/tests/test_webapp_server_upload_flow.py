@@ -74,6 +74,22 @@ def test_special_leave_flow_then_targets_flow():
     print("OK: test_special_leave_flow_then_targets_flow")
 
 
+def test_reset_route_clears_state():
+    client, _ = _client()
+    client.post("/api/upload", json={"a_path": str(A_FILE), "b_path": str(B_FILE)})
+
+    targets_resp = client.get("/api/targets")
+    assert len(targets_resp.json()["targets"]) == 5
+
+    reset_resp = client.post("/api/reset")
+    assert reset_resp.status_code == 200, reset_resp.text
+    assert reset_resp.json() == {"ok": True}
+
+    targets_resp_after = client.get("/api/targets")
+    assert len(targets_resp_after.json()["targets"]) == 0
+    print("OK: test_reset_route_clears_state")
+
+
 def test_proceed_route_returns_400_when_special_leave_undecided():
     client, _ = _client()
     client.post("/api/upload", json={"a_path": str(A_FILE), "b_path": str(B_FILE)})
@@ -87,5 +103,6 @@ if __name__ == "__main__":
     test_upload_route_returns_pending_special_leave_flag()
     test_upload_route_returns_400_on_missing_file()
     test_special_leave_flow_then_targets_flow()
+    test_reset_route_clears_state()
     test_proceed_route_returns_400_when_special_leave_undecided()
     print("ALL OK")

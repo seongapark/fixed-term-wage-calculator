@@ -103,6 +103,7 @@ class AppState:
         self._reset_data()
 
     def load_files(self, a_path, b_path, prev_payroll_path=None):
+        self._reset_data()
         self.employees = load_employees(a_path)
         self.giganje_rows = load_giganje_rows(b_path)
         self.people, self.missing_names, self.ambiguous_names = build_target_people(

@@ -64,6 +64,11 @@ def create_app(state: Optional[AppState] = None) -> FastAPI:
         except (ValueError, FileNotFoundError, OSError) as e:
             raise HTTPException(status_code=400, detail=str(e))
 
+    @app.post("/api/reset")
+    def reset():
+        state.reset()
+        return {"ok": True}
+
     @app.get("/api/special-leave")
     def get_special_leave():
         return {"groups": state.special_leave_groups()}
