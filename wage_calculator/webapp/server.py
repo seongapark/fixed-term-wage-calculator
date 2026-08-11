@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .state import AppState
@@ -188,5 +189,8 @@ def create_app(state: Optional[AppState] = None) -> FastAPI:
         guide_path = Path(__file__).resolve().parent / "static" / "reference" / "leave_category_guide.json"
         entries = json.loads(guide_path.read_text(encoding="utf-8"))
         return {"entries": entries}
+
+    static_dir = Path(__file__).resolve().parent / "static"
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
 
     return app
