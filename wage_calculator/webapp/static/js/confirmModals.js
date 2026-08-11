@@ -17,8 +17,8 @@ function openModal(innerHtml) {
 export function openContractEditModal(person, onSave) {
   const overlay = openModal(`
     <h2 class="modal-title">계약기간 수정 - ${escapeHtml(person.label)}</h2>
-    <div class="form-row"><label>계약 시작일(YYYY-MM-DD)</label><input class="input" id="edit-start" value="${person.contract_start}"></div>
-    <div class="form-row"><label>계약 마지막일(YYYY-MM-DD)</label><input class="input" id="edit-end" value="${person.contract_end}"></div>
+    <div class="form-row"><label>계약 시작일(YYYY-MM-DD)</label><input class="input" id="edit-start" value="${escapeHtml(person.contract_start)}"></div>
+    <div class="form-row"><label>계약 마지막일(YYYY-MM-DD)</label><input class="input" id="edit-end" value="${escapeHtml(person.contract_end)}"></div>
     <div class="modal-actions">
       <button class="btn" id="edit-cancel" type="button">취소</button>
       <button class="btn btn-primary" id="edit-save" type="button">저장</button>
@@ -76,10 +76,10 @@ export async function openConfirmRunModal(onRun) {
     return;
   }
   const holidaysText = info.holidays.length
-    ? `[이번 달(${info.year}년 ${info.month}월) 공휴일]\n${info.holidays.join(", ")}`
+    ? `[이번 달(${info.year}년 ${info.month}월) 공휴일]\n${escapeHtml(info.holidays.join(", "))}`
     : `[이번 달(${info.year}년 ${info.month}월) 공휴일 없음]`;
   const overriddenText = info.overridden_names.length
-    ? `[계약기간을 개별 수정한 인원]\n${info.overridden_names.join(", ")}`
+    ? `[계약기간을 개별 수정한 인원]\n${escapeHtml(info.overridden_names.join(", "))}`
     : `[계약기간을 개별 수정한 인원]\n없음`;
   const overlay = openModal(`
     <h2 class="modal-title">계산 실행 확인</h2>
@@ -139,7 +139,7 @@ export async function openSettingsModal() {
   function renderSurveyTab() {
     body.innerHTML = `
       <table class="table"><thead><tr><th>조사이름</th><th>시작일</th><th>종료일</th><th></th></tr></thead>
-      <tbody>${config.surveys.map(s => `<tr><td>${escapeHtml(s.name)}</td><td>${s.start}</td><td>${s.end}</td><td><button class="btn btn-danger" data-del-survey="${escapeHtml(s.name)}" type="button">삭제</button></td></tr>`).join("")}</tbody></table>
+      <tbody>${config.surveys.map(s => `<tr><td>${escapeHtml(s.name)}</td><td>${escapeHtml(s.start)}</td><td>${escapeHtml(s.end)}</td><td><button class="btn btn-danger" data-del-survey="${escapeHtml(s.name)}" type="button">삭제</button></td></tr>`).join("")}</tbody></table>
       <div class="form-row" style="margin-top:var(--space-4);">
         <input class="input" id="survey-name" placeholder="조사이름">
         <input class="input input-narrow" id="survey-start" placeholder="YYYY-MM-DD">
@@ -186,7 +186,7 @@ export async function openSettingsModal() {
   function renderHolidayTab() {
     body.innerHTML = `
       <ul style="list-style:none; padding:0; margin:0; max-height:220px; overflow-y:auto;">
-        ${config.holidays.map(h => `<li style="display:flex; justify-content:space-between; padding:var(--space-1) 0;">${h}<button class="btn btn-danger" data-del-holiday="${h}" type="button" style="padding:2px 8px;">삭제</button></li>`).join("")}
+        ${config.holidays.map(h => `<li style="display:flex; justify-content:space-between; padding:var(--space-1) 0;">${escapeHtml(h)}<button class="btn btn-danger" data-del-holiday="${escapeHtml(h)}" type="button" style="padding:2px 8px;">삭제</button></li>`).join("")}
       </ul>
       <div class="form-row" style="margin-top:var(--space-4);">
         <input class="input" id="holiday-date" placeholder="예: 2026-01-01">
