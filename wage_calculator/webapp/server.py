@@ -1,4 +1,6 @@
 """AppState를 감싸는 JSON API. 화면(프론트엔드)은 다음 계획에서 이 라우트를 호출한다."""
+import json
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException
@@ -31,6 +33,22 @@ class ContractEditRequest(BaseModel):
 class ProceedRequest(BaseModel):
     year: int
     month: int
+
+
+class SurveyRequest(BaseModel):
+    name: str
+    start: str
+    end: str
+
+
+class RateRequest(BaseModel):
+    year: int
+    daily_wage: int
+    meal_allowance: int
+
+
+class HolidayRequest(BaseModel):
+    date: str
 
 
 def create_app(state: Optional[AppState] = None) -> FastAPI:
@@ -116,5 +134,54 @@ def create_app(state: Optional[AppState] = None) -> FastAPI:
         if data is None:
             raise HTTPException(status_code=404, detail="해당 대상자의 결과를 찾을 수 없습니다.")
         return {"names": state.evidence_names(), **data}
+
+    @app.get("/api/settings")
+    def get_settings():
+        return state.config_obj.to_dict()
+
+    @app.post("/api/settings/survey")
+    def add_survey(req: SurveyRequest):
+        state.config_obj.add_or_update_survey(req.name, req.start, req.end)
+        state.config_obj.save()
+        return state.config_obj.to_dict()
+
+    @app.delete("/api/settings/survey/{name}")
+    def delete_survey(name: str):
+        state.config_obj.delete_survey(name)
+        state.config_obj.save()
+        return state.config_obj.to_dict()
+
+    @app.post("/api/settings/rate")
+    def add_rate(req: RateRequest):
+        state.config_obj.set_year_rates(req.year, req.daily_wage, req.meal_allowance)
+        state.config_obj.save()
+        return state.config_obj.to_dict()
+
+    @app.delete("/api/settings/rate/{year}")
+    def delete_rate(year: int):
+        state.config_obj.delete_year_rates(year)
+        state.config_obj.save()
+        return state.config_obj.to_dict()
+
+    @app.post("/api/settings/holiday")
+    def add_holiday(req: HolidayRequest):
+        try:
+            state.config_obj.add_holiday(req.date)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        state.config_obj.save()
+        return state.config_obj.to_dict()
+
+    @app.delete("/api/settings/holiday/{date}")
+    def delete_holiday(date: str):
+        state.config_obj.remove_holiday(date)
+        state.config_obj.save()
+        return state.config_obj.to_dict()
+
+    @app.get("/api/reference/leave-guide")
+    def get_leave_guide():
+        guide_path = Path(__file__).resolve().parent / "static" / "reference" / "leave_category_guide.json"
+        entries = json.loads(guide_path.read_text(encoding="utf-8"))
+        return {"entries": entries}
 
     return app
