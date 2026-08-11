@@ -130,11 +130,15 @@ class AppState:
             })
         return out
 
+    VALID_SPECIAL_LEAVE_STATUSES = {"유급특별휴가", "무급특별휴가"}
+
     def confirm_special_leave(self, statuses):
         if len(statuses) != len(self.pending_leave_groups):
             raise ValueError("특별휴가 상태 값 개수가 대기 중인 건수와 맞지 않습니다.")
         if any(not s for s in statuses):
             raise ValueError("모든 건에 유급/무급을 지정해야 진행할 수 있습니다.")
+        if any(s not in self.VALID_SPECIAL_LEAVE_STATUSES for s in statuses):
+            raise ValueError("특별휴가 상태 값은 '유급특별휴가' 또는 '무급특별휴가'만 지정할 수 있습니다.")
         for g, status in zip(self.pending_leave_groups, statuses):
             g["status"] = status
             for e in g["events"]:
@@ -185,6 +189,8 @@ class AppState:
             )
         if not (1 <= month <= 12):
             raise ValueError("급여산정 연/월을 올바르게 입력하세요.")
+        if any(g["status"] is None for g in self.pending_leave_groups):
+            raise ValueError("특별휴가 유급/무급을 먼저 지정해야 계산을 진행할 수 있습니다.")
         self.work_year = year
         self.work_month = month
         return [p.name for p in self.people.values() if not p.survey_name]

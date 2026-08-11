@@ -59,9 +59,31 @@ def test_confirm_special_leave_rejects_empty_status():
     print("OK: test_confirm_special_leave_rejects_empty_status")
 
 
+def test_confirm_special_leave_rejects_invalid_status_value():
+    state = _loaded_state()
+    try:
+        state.confirm_special_leave(["연차"])
+        assert False, "ValueError를 기대했지만 발생하지 않음"
+    except ValueError:
+        pass
+    print("OK: test_confirm_special_leave_rejects_invalid_status_value")
+
+
+def test_prepare_calculation_blocks_when_special_leave_undecided():
+    state = _loaded_state()
+    try:
+        state.prepare_calculation(2026, 8)
+        assert False, "ValueError를 기대했지만 발생하지 않음"
+    except ValueError:
+        pass
+    print("OK: test_prepare_calculation_blocks_when_special_leave_undecided")
+
+
 if __name__ == "__main__":
     test_special_leave_groups_includes_reason_and_note()
     test_confirm_special_leave_sets_event_classification()
     test_confirm_special_leave_rejects_wrong_length()
     test_confirm_special_leave_rejects_empty_status()
+    test_confirm_special_leave_rejects_invalid_status_value()
+    test_prepare_calculation_blocks_when_special_leave_undecided()
     print("ALL OK")

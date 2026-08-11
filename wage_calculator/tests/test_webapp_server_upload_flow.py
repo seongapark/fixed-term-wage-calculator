@@ -74,8 +74,18 @@ def test_special_leave_flow_then_targets_flow():
     print("OK: test_special_leave_flow_then_targets_flow")
 
 
+def test_proceed_route_returns_400_when_special_leave_undecided():
+    client, _ = _client()
+    client.post("/api/upload", json={"a_path": str(A_FILE), "b_path": str(B_FILE)})
+    # 특별휴가 확정(/api/special-leave/confirm) 없이 바로 진행을 시도한다.
+    resp = client.post("/api/targets/proceed", json={"year": 2026, "month": 8})
+    assert resp.status_code == 400, resp.text
+    print("OK: test_proceed_route_returns_400_when_special_leave_undecided")
+
+
 if __name__ == "__main__":
     test_upload_route_returns_pending_special_leave_flag()
     test_upload_route_returns_400_on_missing_file()
     test_special_leave_flow_then_targets_flow()
+    test_proceed_route_returns_400_when_special_leave_undecided()
     print("ALL OK")
