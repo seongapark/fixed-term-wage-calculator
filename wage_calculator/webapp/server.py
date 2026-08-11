@@ -86,4 +86,35 @@ def create_app(state: Optional[AppState] = None) -> FastAPI:
             raise HTTPException(status_code=400, detail=str(e))
         return {"unassigned_names": unassigned}
 
+    @app.get("/api/confirm-info")
+    def confirm_info():
+        try:
+            return state.confirm_info()
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @app.post("/api/calculate")
+    def calculate():
+        errors = state.run_calculation()
+        return {"errors": errors}
+
+    @app.get("/api/results")
+    def get_results():
+        return {"results": state.results_summary()}
+
+    @app.post("/api/download")
+    def download():
+        try:
+            saved = state.download()
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        return {"saved_paths": saved}
+
+    @app.get("/api/evidence")
+    def get_evidence(key: str):
+        data = state.evidence_for(key)
+        if data is None:
+            raise HTTPException(status_code=404, detail="해당 대상자의 결과를 찾을 수 없습니다.")
+        return {"names": state.evidence_names(), **data}
+
     return app
