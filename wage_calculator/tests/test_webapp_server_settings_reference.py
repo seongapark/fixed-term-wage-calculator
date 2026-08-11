@@ -5,20 +5,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient
 
+import core.config as config_module
 from core.config import Config
 from webapp.server import create_app
 from webapp.state import AppState
 
 
-def _client():
+def _client(tmp_path, monkeypatch):
+    monkeypatch.setattr(config_module, "config_path", lambda: tmp_path / "config.json")
     state = AppState()
     state.config_obj = Config({"surveys": [], "rates": {}, "holidays": []})
     app = create_app(state)
     return TestClient(app), state
 
 
-def test_settings_survey_crud():
-    client, state = _client()
+def test_settings_survey_crud(tmp_path, monkeypatch):
+    client, state = _client(tmp_path, monkeypatch)
     add_resp = client.post("/api/settings/survey", json={"name": "9월 조사", "start": "2026-09-01", "end": "2026-09-30"})
     assert add_resp.status_code == 200, add_resp.text
     assert state.config_obj.survey_names() == ["9월 조사"]
@@ -29,8 +31,8 @@ def test_settings_survey_crud():
     print("OK: test_settings_survey_crud")
 
 
-def test_settings_rate_crud():
-    client, state = _client()
+def test_settings_rate_crud(tmp_path, monkeypatch):
+    client, state = _client(tmp_path, monkeypatch)
     add_resp = client.post("/api/settings/rate", json={"year": 2026, "daily_wage": 78560, "meal_allowance": 160000})
     assert add_resp.status_code == 200, add_resp.text
     assert state.config_obj.daily_wage_for(2026) == 78560
@@ -41,8 +43,8 @@ def test_settings_rate_crud():
     print("OK: test_settings_rate_crud")
 
 
-def test_settings_holiday_crud():
-    client, state = _client()
+def test_settings_holiday_crud(tmp_path, monkeypatch):
+    client, state = _client(tmp_path, monkeypatch)
     add_resp = client.post("/api/settings/holiday", json={"date": "2026-08-15"})
     assert add_resp.status_code == 200, add_resp.text
     assert state.config_obj.holidays == ["2026-08-15"]
@@ -53,8 +55,8 @@ def test_settings_holiday_crud():
     print("OK: test_settings_holiday_crud")
 
 
-def test_get_settings_returns_all_three_lists():
-    client, state = _client()
+def test_get_settings_returns_all_three_lists(tmp_path, monkeypatch):
+    client, state = _client(tmp_path, monkeypatch)
     client.post("/api/settings/survey", json={"name": "9월 조사", "start": "2026-09-01", "end": "2026-09-30"})
     client.post("/api/settings/rate", json={"year": 2026, "daily_wage": 78560, "meal_allowance": 160000})
     client.post("/api/settings/holiday", json={"date": "2026-08-15"})
@@ -68,19 +70,10 @@ def test_get_settings_returns_all_three_lists():
     print("OK: test_get_settings_returns_all_three_lists")
 
 
-def test_reference_leave_guide_route_returns_full_list():
-    client, _ = _client()
+def test_reference_leave_guide_route_returns_full_list(tmp_path, monkeypatch):
+    client, _ = _client(tmp_path, monkeypatch)
     resp = client.get("/api/reference/leave-guide")
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["entries"]) >= 40
     print("OK: test_reference_leave_guide_route_returns_full_list")
-
-
-if __name__ == "__main__":
-    test_settings_survey_crud()
-    test_settings_rate_crud()
-    test_settings_holiday_crud()
-    test_get_settings_returns_all_three_lists()
-    test_reference_leave_guide_route_returns_full_list()
-    print("ALL OK")
