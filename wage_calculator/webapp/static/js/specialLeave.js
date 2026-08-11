@@ -38,19 +38,23 @@ export async function render(container) {
   const icon = container.querySelector("#guide-icon");
   const panel = container.querySelector("#guide-panel");
   let hideTimer = null;
+  let isHovering = false;
   const showPanel = () => { clearTimeout(hideTimer); panel.style.display = "block"; };
   const scheduleHide = () => { hideTimer = setTimeout(() => { panel.style.display = "none"; }, 150); };
 
   icon.addEventListener("mouseenter", async () => {
+    isHovering = true;
+    clearTimeout(hideTimer);
     const entries = await ensureGuideLoaded();
+    if (!isHovering) return;
     panel.innerHTML = `<table class="table"><thead><tr><th>종별</th><th>세부</th><th>설명</th><th>공제여부</th><th>시간입력</th></tr></thead><tbody>${
       entries.map(e => `<tr><td>${escapeHtml(e.category)}</td><td>${escapeHtml(e.subtype)}${e.detail ? " · " + escapeHtml(e.detail) : ""}</td><td>${escapeHtml(e.description)}</td><td>${escapeHtml(e.deduction)}</td><td>${escapeHtml(e.time_entry)}${e.note ? "<br><span class=\"text-muted\">" + escapeHtml(e.note) + "</span>" : ""}</td></tr>`).join("")
     }</tbody></table>`;
     showPanel();
   });
-  icon.addEventListener("mouseleave", scheduleHide);
-  panel.addEventListener("mouseenter", showPanel);
-  panel.addEventListener("mouseleave", scheduleHide);
+  icon.addEventListener("mouseleave", () => { isHovering = false; scheduleHide(); });
+  panel.addEventListener("mouseenter", () => { isHovering = true; showPanel(); });
+  panel.addEventListener("mouseleave", () => { isHovering = false; scheduleHide(); });
 
   const tbody = container.querySelector("#rows");
   const nextBtn = container.querySelector("#next-btn");
