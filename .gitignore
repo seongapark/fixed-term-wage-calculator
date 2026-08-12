@@ -8,3 +8,5 @@ config.json
 *.exe
 .worktrees/
 .superpowers/
+*.cab
+wage_calculator/webview2_fixedversion/
