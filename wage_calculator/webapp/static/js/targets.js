@@ -27,6 +27,7 @@ export async function render(container) {
           <button class="btn" id="select-all" type="button">전체선택</button>
           <button class="btn" id="deselect-all" type="button">전체해제</button>
         </div>
+        <button class="btn" id="back-to-upload-btn" type="button">← 파일 다시 첨부하기</button>
       </div>
       <div class="form-row" style="margin-top:var(--space-4);">
         <label>담당조사 일괄 지정</label>
@@ -85,6 +86,10 @@ export async function render(container) {
   container.querySelector("#deselect-all").addEventListener("click", () => {
     checked.clear();
     renderRows();
+  });
+
+  container.querySelector("#back-to-upload-btn").addEventListener("click", () => {
+    navigate("upload");
   });
 
   container.querySelector("#batch-assign").addEventListener("click", async () => {
