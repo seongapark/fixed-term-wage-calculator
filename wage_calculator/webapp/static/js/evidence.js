@@ -23,11 +23,11 @@ export async function render(container, params) {
         <button class="btn" id="back-btn" type="button" style="margin-left:auto;">← 결과 화면</button>
       </div>
       <div class="evidence-layout">
-        <div class="evidence-col" style="flex:1;">
+        <div class="evidence-col">
           <h3>근무현황 원본(B파일)</h3>
           <table class="table"><thead><tr><th>종별</th><th>사용기간(날짜)</th><th>사용시간(시분)</th><th>사유</th><th>비고</th></tr></thead><tbody id="raw-rows"></tbody></table>
         </div>
-        <div class="evidence-col" style="flex:2;">
+        <div class="evidence-col">
           <div class="tabs">
             <div class="tab active" data-tab="weekly">주휴 산정근거</div>
             <div class="tab" data-tab="lateout">조퇴외출 산정근거</div>
