@@ -49,18 +49,18 @@ def bootstrap_server(state: AppState) -> int:
 
 class JSApi:
     def __init__(self, state: AppState):
-        self.state = state
+        self._state = state
 
     def pick_file(self, kind: str):
-        start_dir = self.state.config_obj.last_upload_dir or ""
+        start_dir = self._state.config_obj.last_upload_dir or ""
         result = webview.windows[0].create_file_dialog(
             webview.OPEN_DIALOG, directory=start_dir, file_types=("Excel Files (*.xlsx)",)
         )
         if not result:
             return None
         path = result[0]
-        self.state.config_obj.set_last_upload_dir(str(Path(path).parent))
-        self.state.config_obj.save()
+        self._state.config_obj.set_last_upload_dir(str(Path(path).parent))
+        self._state.config_obj.save()
         return path
 
 
