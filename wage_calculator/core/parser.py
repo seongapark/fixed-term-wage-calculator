@@ -141,7 +141,16 @@ def build_target_people(giganje_rows, employees: dict):
 
     for row in giganje_rows:
         name = row["성명"]
-        birth = str(row.get("생년월일") or "").strip()
+        raw_birth = row.get("생년월일")
+        # openpyxl은 날짜형 셀을 datetime으로 반환하므로 str()로 그냥 비교하면
+        # "1995-05-05 00:00:00" 같은 시간 포함 문자열이 되어 동명이인 매칭이
+        # 조용히 실패한다(core/retroactive.py의 _row_birth_matches와 동일한 문제).
+        # date_utils.parse_date로 정규화한 뒤 비교해야 한다. 형식이 이상한
+        # 값은 기존 동작대로 원문 문자열 비교로 안전하게 폴백한다.
+        try:
+            birth = date_utils.parse_date(raw_birth).isoformat() if raw_birth not in (None, "") else ""
+        except ValueError:
+            birth = str(raw_birth or "").strip()
 
         candidates = name_index.get(name, [])
         person = None
