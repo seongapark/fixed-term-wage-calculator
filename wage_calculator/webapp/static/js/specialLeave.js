@@ -66,7 +66,7 @@ export async function render(container) {
       const cls = status === "유급특별휴가" ? "paid" : status === "무급특별휴가" ? "unpaid" : "";
       return `<tr>
         <td>${escapeHtml(g.person_name)}</td>
-        <td>${period}</td>
+        <td>${escapeHtml(period)}</td>
         <td>${escapeHtml(g.reason)}</td>
         <td>${escapeHtml(g.note)}</td>
         <td><span class="status-pill ${cls}" data-idx="${idx}">${STATUS_LABEL[status]}</span></td>
