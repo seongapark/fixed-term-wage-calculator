@@ -70,6 +70,32 @@ def test_evidence_for_known_person_has_all_sections():
     print("OK: test_evidence_for_known_person_has_all_sections")
 
 
+def test_evidence_for_matches_raw_rows_by_name_when_birth_is_unavailable():
+    """A파일에 '생년월일' 컬럼이 없거나(선택 컬럼) 비어있으면 TargetPerson.birth가
+    ""로 남는다. 이때 evidence_for()가 여전히 정확한 생년월일 일치를
+    요구하면, B파일에 실제로 그 사람의 행이 있어도(성명은 일치) 원본이
+    영원히 안 보인다. build_target_people()이 동명이인 없는 사람은 이름만
+    으로도 안전하게 매칭하는 것과 동일하게, birth가 비어있을 때는 이름만
+    으로 매칭해야 한다."""
+    state = _calculated_state()
+    hong_result = next(r for r in state.results if r.name == "홍길동")
+    before = state.evidence_for(person_key(hong_result.name, hong_result.birth))
+    assert len(before["raw_rows"]) > 0, "테스트 전제 실패: 홍길동의 원본 행이 없음"
+
+    # A파일에 생년월일 컬럼이 없는 상황을 재현: 계산 결과의 birth를 비운다
+    # (PayrollResult는 계산 시점에 TargetPerson.birth를 복사해 가지므로,
+    # results 쪽을 직접 비워야 실제 상황을 재현할 수 있다).
+    hong_result.birth = ""
+    empty_birth_key = person_key(hong_result.name, "")
+
+    after = state.evidence_for(empty_birth_key)
+    assert after is not None, "빈 생년월일로도 대상자를 찾을 수 있어야 함"
+    assert len(after["raw_rows"]) == len(before["raw_rows"]), (
+        "생년월일이 비어있어도 이름이 일치하면 원본 행이 매칭되어야 함"
+    )
+    print("OK: test_evidence_for_matches_raw_rows_by_name_when_birth_is_unavailable")
+
+
 def test_evidence_for_matches_raw_rows_when_birth_cell_is_a_real_date():
     """B파일의 '생년월일' 셀이 순수 텍스트가 아니라 실제 날짜형(datetime)일 때도
     근무현황 원본이 정상적으로 매칭되어야 한다 - openpyxl은 날짜형 셀을
@@ -104,5 +130,6 @@ if __name__ == "__main__":
     test_evidence_names_matches_results_count()
     test_evidence_for_returns_none_for_unknown_key()
     test_evidence_for_known_person_has_all_sections()
+    test_evidence_for_matches_raw_rows_by_name_when_birth_is_unavailable()
     test_evidence_for_matches_raw_rows_when_birth_cell_is_a_real_date()
     print("ALL OK")

@@ -278,14 +278,20 @@ class AppState:
         for row in self.giganje_rows:
             if row["성명"] != result.name:
                 continue
-            row_birth = row.get("생년월일")
-            if row_birth is None or str(row_birth).strip() == "":
-                continue
-            try:
-                if date_utils.parse_date(row_birth).isoformat() != result.birth:
+            # A파일에 생년월일이 없어서(선택 컬럼) result.birth가 빈 값인 경우는
+            # 이름만으로 매칭한다 - core/parser.py의 build_target_people()이
+            # 동명이인이 없는 사람은 이미 이름만으로 B파일 행을 붙이는 것과
+            # 동일한 기준이다(계산 엔진이 이미 그렇게 신뢰하고 있으므로, 산정근거
+            # 화면만 더 엄격하게 굴어서 원본을 못 보여줄 이유가 없다).
+            if result.birth:
+                row_birth = row.get("생년월일")
+                if row_birth is None or str(row_birth).strip() == "":
                     continue
-            except ValueError:
-                continue
+                try:
+                    if date_utils.parse_date(row_birth).isoformat() != result.birth:
+                        continue
+                except ValueError:
+                    continue
             raw_rows.append({
                 "category": row.get("종별") or "",
                 "period": row.get("사용기간(날짜)") or "",
