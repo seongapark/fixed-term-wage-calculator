@@ -278,7 +278,13 @@ class AppState:
         for row in self.giganje_rows:
             if row["성명"] != result.name:
                 continue
-            if str(row.get("생년월일") or "").strip() != result.birth:
+            row_birth = row.get("생년월일")
+            if row_birth is None or str(row_birth).strip() == "":
+                continue
+            try:
+                if date_utils.parse_date(row_birth).isoformat() != result.birth:
+                    continue
+            except ValueError:
                 continue
             raw_rows.append({
                 "category": row.get("종별") or "",

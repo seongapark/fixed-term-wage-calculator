@@ -1,9 +1,11 @@
 import sys
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.config import Config
+from core.parser import person_key
 from webapp.state import AppState
 
 FIXTURE_DIR = Path(__file__).resolve().parent.parent.parent / "demo_assets"
@@ -68,9 +70,39 @@ def test_evidence_for_known_person_has_all_sections():
     print("OK: test_evidence_for_known_person_has_all_sections")
 
 
+def test_evidence_for_matches_raw_rows_when_birth_cell_is_a_real_date():
+    """B파일의 '생년월일' 셀이 순수 텍스트가 아니라 실제 날짜형(datetime)일 때도
+    근무현황 원본이 정상적으로 매칭되어야 한다 - openpyxl은 날짜형 셀을
+    datetime으로 반환하므로 str()로 그냥 비교하면 시간이 붙어 매칭이 조용히
+    실패한다(core/retroactive.py의 _row_birth_matches가 이미 같은 문제를
+    해결한 적이 있는데, evidence_for()는 그 정규화 없이 이관됨)."""
+    state = _calculated_state()
+    hong = next(p for p in state.people.values() if p.name == "홍길동")
+    key = person_key(hong.name, hong.birth)
+
+    before = state.evidence_for(key)
+    assert len(before["raw_rows"]) > 0, "테스트 전제 실패: 홍길동의 원본 행이 없음"
+
+    mutated = 0
+    for row in state.giganje_rows:
+        if row["성명"] == hong.name:
+            # openpyxl은 날짜형 셀을 datetime.date가 아니라 datetime.datetime으로
+            # 반환한다(시각이 00:00:00으로 채워짐) - 이 형태로 정확히 재현해야 한다.
+            row["생년월일"] = datetime.fromisoformat(hong.birth)
+            mutated += 1
+    assert mutated > 0, "테스트 전제 실패: 변형할 원본 행이 없음"
+
+    after = state.evidence_for(key)
+    assert len(after["raw_rows"]) == len(before["raw_rows"]), (
+        "생년월일 셀이 날짜형이어도 원본 행 매칭 개수가 동일해야 함"
+    )
+    print("OK: test_evidence_for_matches_raw_rows_when_birth_cell_is_a_real_date")
+
+
 if __name__ == "__main__":
     test_results_summary_has_five_rows_with_expected_keys()
     test_evidence_names_matches_results_count()
     test_evidence_for_returns_none_for_unknown_key()
     test_evidence_for_known_person_has_all_sections()
+    test_evidence_for_matches_raw_rows_when_birth_cell_is_a_real_date()
     print("ALL OK")
