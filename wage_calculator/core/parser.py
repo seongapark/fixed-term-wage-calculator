@@ -40,12 +40,24 @@ def load_employees(path) -> dict:
         if name is None or str(name).strip() == "":
             continue
         name = str(name).strip()
+        # 생년월일 셀도 B파일과 동일하게 정규화한다 - 이 값(Employee.birth)이
+        # TargetPerson.birth -> PayrollResult.birth로 그대로 흘러가 person_key(),
+        # 산정근거 화면의 원본 매칭 등 생년월일을 비교하는 모든 곳의 기준값이
+        # 되므로, 여기서 안 고치면 B파일 쪽만 고쳐도 계속 어긋난다.
+        raw_birth = row.get("생년월일") if has_birth else None
+        if raw_birth in (None, ""):
+            birth = ""
+        else:
+            try:
+                birth = date_utils.parse_date(raw_birth).isoformat()
+            except ValueError:
+                birth = str(raw_birth).strip()
         emp = Employee(
             name=name,
             ssn=str(row.get("주민번호") or "").strip(),
             bank=str(row.get("은행") or "").strip(),
             account=str(row.get("계좌번호") or "").strip(),
-            birth=str(row.get("생년월일") or "").strip() if has_birth else "",
+            birth=birth,
         )
         employees.setdefault(name, []).append(emp)
     return employees
