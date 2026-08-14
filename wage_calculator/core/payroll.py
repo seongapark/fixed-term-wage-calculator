@@ -46,6 +46,10 @@ class PayrollResult:
     late_out_events: list = field(default_factory=list)
     special_leave_events: list = field(default_factory=list)
     special_leave_note: str = ""
+    leave_offset_minutes: int = 0
+    leave_shortfall_minutes: int = 0
+    leave_shortfall: bool = False
+    leave_offset_map: dict = field(default_factory=dict)
 
 
 def compute_pay_period(contract_start: date, contract_end: date, year: int, month: int):
@@ -77,8 +81,24 @@ def calc_payroll(person, config, year: int, month: int) -> PayrollResult:
     actual_workdays = workdays - public_leave_days - (paid_holiday_days + absence_days)
     total_days = actual_workdays + paid_holiday_days + public_leave_days
 
+    monthly_windows = leave_engine.compute_monthly_leave_windows(contract_start, contract_end, person.events)
+    consumption = leave_engine.simulate_leave_consumption(monthly_windows, person.events)
+    offset_map = consumption.offset_by_id
+    leave_engine.build_leave_ledger(monthly_windows, offset_map)
+    balance_minutes = leave_engine.leave_balance_minutes_as_of(monthly_windows, period_end, offset_map)
+    remaining_leave_days = balance_minutes / 480
+
     late_out_events = [e for e in period_events if e.is_time_based]
-    late_out_minutes = sum(e.minutes for e in late_out_events)
+    # 급여 공제분 = 전체 시간공제분 - 연가로 상계된 조퇴/외출/지각 분
+    gita_covered = sum(
+        offset_map.get(id(e), 0)
+        for e in late_out_events if e.classified == "기타"
+    )
+    late_out_minutes = sum(e.minutes for e in late_out_events) - gita_covered
+    gita_used = sum(e.minutes for e in late_out_events if e.classified == "기타")
+    leave_offset_minutes = gita_covered
+    leave_shortfall_minutes = gita_used - gita_covered
+    leave_shortfall = leave_shortfall_minutes > 0
 
     weekly_windows = leave_engine.compute_weekly_holiday_windows(contract_start, contract_end, person.events)
     weekly_holiday_days = leave_engine.weekly_holidays_for_month(weekly_windows, year, month)
@@ -86,11 +106,6 @@ def calc_payroll(person, config, year: int, month: int) -> PayrollResult:
     calendar_month_days = date_utils.month_calendar_days(month_last)
     period_total_days = (period_end - period_start).days + 1
     meal_eligible_days = period_total_days - absence_days
-
-    monthly_windows = leave_engine.compute_monthly_leave_windows(contract_start, contract_end, person.events)
-    leave_engine.build_leave_ledger(monthly_windows)
-    balance_minutes = leave_engine.leave_balance_minutes_as_of(monthly_windows, period_end)
-    remaining_leave_days = balance_minutes / 480
 
     is_final_month = period_end == contract_end
 
@@ -124,6 +139,10 @@ def calc_payroll(person, config, year: int, month: int) -> PayrollResult:
         late_out_events=late_out_events,
         special_leave_events=special_leave_events,
         special_leave_note=_format_special_leave_note(special_leave_events),
+        leave_offset_minutes=leave_offset_minutes,
+        leave_shortfall_minutes=leave_shortfall_minutes,
+        leave_shortfall=leave_shortfall,
+        leave_offset_map=offset_map,
     )
 
 
