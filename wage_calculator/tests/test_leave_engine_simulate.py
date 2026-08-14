@@ -52,9 +52,29 @@ def test_explicit_leave_consumes_before_late_out_same_pool():
     assert sim.offset_by_id.get(id(late), 0) == 0
 
 
+def test_same_date_accrual_before_late_out():
+    """발생일(8/1, 7월 만근분)과 같은 날짜의 조퇴는 그날 발생분(+480)이 먼저
+    반영된 뒤 상계돼야 한다(정렬 종류 0 -> 2). 발생이 나중에 처리되면 상계 0이 되어 실패."""
+    late = build_event("조퇴", date(2026, 8, 1), time(14, 0), time(18, 0), 240)
+    _, sim = _sim([late])
+    assert sim.offset_by_id[id(late)] == 240
+
+
+def test_same_date_explicit_leave_before_late_out():
+    """같은 날짜(8/1)에 명시적 연가(480)와 조퇴(240)가 함께 있으면 연가가 먼저
+    풀을 소진(종류 1 -> 2)하므로 조퇴 상계는 0이어야 한다. 정렬이 깨져 조퇴가
+    먼저면 240이 상계되어 실패."""
+    leave = build_event("연가", date(2026, 8, 1))
+    late = build_event("조퇴", date(2026, 8, 1), time(14, 0), time(18, 0), 240)
+    _, sim = _sim([leave, late])
+    assert sim.offset_by_id.get(id(late), 0) == 0
+
+
 if __name__ == "__main__":
     test_late_out_before_accrual_not_offset()
     test_late_out_after_accrual_offset_up_to_balance()
     test_late_out_shortfall_partial_offset()
     test_explicit_leave_consumes_before_late_out_same_pool()
+    test_same_date_accrual_before_late_out()
+    test_same_date_explicit_leave_before_late_out()
     print("ALL OK")
