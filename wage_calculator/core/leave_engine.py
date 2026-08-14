@@ -209,3 +209,45 @@ def leave_balance_minutes_as_of(windows: List[MonthlyWindowResult], as_of: date)
         if w.start > as_of:
             break
     return accrued_minutes - used_minutes
+
+
+@dataclass
+class LeaveConsumption:
+    offset_by_id: dict = field(default_factory=dict)  # id(event) -> 연가로 상계된 분
+    total_offset_minutes: int = 0
+
+
+def simulate_leave_consumption(windows, events) -> LeaveConsumption:
+    """계약 전체 이벤트를 날짜순으로 걸으며 조퇴/외출/지각(시간 기재 '기타')의
+    연가 상계분을 산출한다.
+
+    타임라인 항목의 정렬 키 (날짜, 종류):
+      종류 0 = 발생(+480, available_from = 구간종료+1일)
+      종류 1 = 명시적 연가/반일연가 소진(그대로 차감, 음수 허용)
+      종류 2 = 조퇴/외출/지각 상계(그 시점 양의 잔량 한도 내에서만)
+    같은 날짜면 발생 -> 명시적 연가 -> 조퇴/외출/지각 순으로 처리한다.
+    """
+    entries = []  # (date, kind, minutes, event_or_None)
+    for w in windows:
+        if w.accrued:
+            entries.append((w.effective_end + timedelta(days=1), 0, 480, None))
+    for e in events:
+        if e.classified in ("연가", "반일연가"):
+            entries.append((e.d, 1, leave_usage_minutes(e), e))
+        elif e.is_time_based and e.classified == "기타":
+            entries.append((e.d, 2, e.minutes, e))
+    entries.sort(key=lambda x: (x[0], x[1]))
+
+    balance = 0
+    result = LeaveConsumption()
+    for d, kind, minutes, e in entries:
+        if kind == 0:
+            balance += minutes
+        elif kind == 1:
+            balance -= minutes  # 명시적 연가: 잔량 부족해도 차감(기존 정책, 음수 허용)
+        else:
+            covered = min(minutes, max(balance, 0))
+            result.offset_by_id[id(e)] = covered
+            result.total_offset_minutes += covered
+            balance -= covered
+    return result
