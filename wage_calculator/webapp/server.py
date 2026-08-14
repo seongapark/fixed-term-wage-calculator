@@ -124,7 +124,7 @@ def create_app(state: Optional[AppState] = None) -> FastAPI:
 
     @app.get("/api/results")
     def get_results():
-        return {"results": state.results_summary()}
+        return {"results": state.results_summary(), "has_retroactive": state.has_retroactive()}
 
     @app.post("/api/download")
     def download():

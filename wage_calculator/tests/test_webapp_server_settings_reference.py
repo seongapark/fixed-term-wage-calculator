@@ -13,6 +13,7 @@ from webapp.state import AppState
 
 def _client(tmp_path, monkeypatch):
     monkeypatch.setattr(config_module, "config_path", lambda: tmp_path / "config.json")
+    monkeypatch.setattr(config_module, "legacy_config_path", lambda: tmp_path / "legacy_config.json")
     state = AppState()
     state.config_obj = Config({"surveys": [], "rates": {}, "holidays": []})
     app = create_app(state)

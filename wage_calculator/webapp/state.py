@@ -244,8 +244,13 @@ class AppState:
         all_names = [r.name for r in self.results]
         out = []
         for r in self.results:
+            key = person_key(r.name, r.birth)
+            # 엑셀 build_wage_sheet와 동일하게 소급조정액을 반영한다:
+            # 최종지급액 = 지급총액 + 소급조정액. 소급(전월 파일) 미첨부거나
+            # 전월 파일에 없던 사람은 조정액 0 -> 최종지급액 == 지급총액.
+            adjustment = self.retro_adjustments.get(key, 0)
             out.append({
-                "key": person_key(r.name, r.birth),
+                "key": key,
                 "label": display_label(r.name, r.birth, all_names),
                 "survey": r.survey_name,
                 "period": f"{r.period_start.isoformat()}~{r.period_end.isoformat()}",
@@ -253,8 +258,15 @@ class AppState:
                 "weekly_holiday_days": r.weekly_holiday_days,
                 "remaining_leave_days": round(r.remaining_leave_days, 2),
                 "total_payment": r.total_payment,
+                "retro_adjustment": adjustment,
+                "final_payment": r.total_payment + adjustment,
             })
         return out
+
+    def has_retroactive(self):
+        """소급(전월 임금내역) 첨부로 0이 아닌 소급조정액이 하나라도 있으면 True.
+        프론트엔드가 소급조정액/최종지급액 열을 보여줄지 결정하는 데 쓴다."""
+        return any(v for v in self.retro_adjustments.values())
 
     def evidence_names(self):
         all_names = [r.name for r in self.results]

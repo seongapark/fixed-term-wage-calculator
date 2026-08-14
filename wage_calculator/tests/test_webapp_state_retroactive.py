@@ -118,7 +118,36 @@ def test_run_calculation_computes_nonzero_retro_adjustment_end_to_end():
     print("OK: test_run_calculation_computes_nonzero_retro_adjustment_end_to_end")
 
 
+def test_results_summary_applies_retro_so_window_matches_excel():
+    """프로그램 창이 읽는 results_summary()도 소급조정액을 반영한 최종지급액을
+    내보내야 한다(엑셀 build_wage_sheet의 최종지급액 = 지급총액 + 소급조정액과
+    동일). 소급 대상인 홍길동은 조정액이 붙고, 전월 파일에 없던 사람은 0이라
+    최종지급액 == 지급총액이어야 한다."""
+    state = _ready_state_with_previous_payroll()
+    errors = state.run_calculation()
+    assert errors == [], errors
+
+    hong = next(p for p in state.people.values() if p.ssn == HONG_SSN)
+    hong_key = person_key(hong.name, hong.birth)
+
+    summary = state.results_summary()
+    hong_row = next(r for r in summary if r["key"] == hong_key)
+
+    assert hong_row["retro_adjustment"] == HONG_EXPECTED_ADJUSTMENT, hong_row
+    assert hong_row["final_payment"] == hong_row["total_payment"] + HONG_EXPECTED_ADJUSTMENT, hong_row
+
+    # 전월 파일에 없던 사람(소급 대상 아님)은 조정 0, 최종 == 지급총액.
+    non_retro_rows = [r for r in summary if r["key"] != hong_key]
+    assert non_retro_rows, "비교용 비소급 대상자가 있어야 함"
+    for r in non_retro_rows:
+        assert r["retro_adjustment"] == 0, r
+        assert r["final_payment"] == r["total_payment"], r
+
+    print("OK: test_results_summary_applies_retro_so_window_matches_excel")
+
+
 if __name__ == "__main__":
     test_load_files_populates_previous_payroll_from_fixture()
     test_run_calculation_computes_nonzero_retro_adjustment_end_to_end()
+    test_results_summary_applies_retro_so_window_matches_excel()
     print("ALL OK")

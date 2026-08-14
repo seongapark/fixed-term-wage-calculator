@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass, field, asdict
 from datetime import date
 
-from .paths import config_path
+from .paths import config_path, is_frozen, legacy_config_path
 
 DEFAULT_CONFIG = {
     "surveys": [],       # [{"name": str, "start": "YYYY-MM-DD", "end": "YYYY-MM-DD"}]
@@ -20,7 +20,14 @@ def _iso(d):
 class Config:
     def __init__(self, data: dict):
         self.surveys = data.get("surveys", [])
-        self.rates = dict(data.get("rates", {}))
+        self.rates = {y: dict(r) for y, r in data.get("rates", {}).items()}
+        # 옛 버전 exe(v4.0/v4.1)는 rates 항목을 옛 필드명 hourly_wage로 저장한다.
+        # 여러 버전 exe가 config.json 하나를 공유하므로, 구버전이 마지막에 저장한
+        # 파일을 신버전(daily_wage 기대)이 읽으면 요율이 "없다"고 오인한다. 여기서
+        # 옛 필드명을 새 필드명으로 정규화해 두면 to_dict()/save()로 파일이 자가치유된다.
+        for r in self.rates.values():
+            if "daily_wage" not in r and "hourly_wage" in r:
+                r["daily_wage"] = r.pop("hourly_wage")
         if not self.rates and "common" in data:
             # 레거시 config.json(단일 공통입력값) 마이그레이션: 현재 연도로 1회 이전.
             legacy = data["common"]
@@ -104,16 +111,36 @@ class Config:
 
     def save(self):
         path = config_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(self.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
 
     @classmethod
     def load(cls):
+        # 설정은 %APPDATA%(config_path)에 저장한다. 아직 없으면 구버전이 쓰던
+        # exe 옆 경로(legacy_config_path)에서 읽어와 최초 1회 새 위치로 이전한다.
         path = config_path()
+        legacy = legacy_config_path()
         if path.exists():
+            source = path
+        elif legacy.exists():
+            source = legacy
+        else:
+            source = None
+
+        if source is not None:
             try:
-                data = json.loads(path.read_text(encoding="utf-8"))
+                data = json.loads(source.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
                 data = dict(DEFAULT_CONFIG)
         else:
             data = dict(DEFAULT_CONFIG)
-        return cls(data)
+
+        obj = cls(data)
+        # 구버전 경로에서 읽어왔다면 새 위치로 이전 저장한다. 실제 배포(exe) 환경에서만
+        # 수행해, 테스트·소스 실행이 사용자 %APPDATA%를 건드리지 않도록 한다.
+        if source is legacy and is_frozen():
+            try:
+                obj.save()
+            except OSError:
+                pass
+        return obj

@@ -2,11 +2,11 @@ import { api } from "./api.js";
 import { showError } from "./toast.js";
 import { escapeHtml } from "./utils.js";
 
-function openModal(innerHtml) {
+function openModal(innerHtml, extraClass = "") {
   const root = document.getElementById("modal-root");
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
-  overlay.innerHTML = `<div class="modal">${innerHtml}</div>`;
+  overlay.innerHTML = `<div class="modal ${extraClass}">${innerHtml}</div>`;
   root.appendChild(overlay);
   overlay.addEventListener("click", (evt) => {
     if (evt.target === overlay) overlay.remove();
@@ -130,7 +130,7 @@ export async function openSettingsModal() {
     <div class="modal-actions">
       <button class="btn btn-primary" id="settings-close" type="button">닫기</button>
     </div>
-  `);
+  `, "modal-wide");
   overlay.querySelector("#settings-close").addEventListener("click", () => overlay.remove());
 
   const tabs = overlay.querySelectorAll(".tab");
@@ -142,8 +142,8 @@ export async function openSettingsModal() {
       <tbody>${config.surveys.map(s => `<tr><td>${escapeHtml(s.name)}</td><td>${escapeHtml(s.start)}</td><td>${escapeHtml(s.end)}</td><td><button class="btn btn-danger" data-del-survey="${escapeHtml(s.name)}" type="button">삭제</button></td></tr>`).join("")}</tbody></table>
       <div class="form-row" style="margin-top:var(--space-4);">
         <input class="input" id="survey-name" placeholder="조사이름">
-        <input class="input input-narrow" id="survey-start" placeholder="YYYY-MM-DD">
-        <input class="input input-narrow" id="survey-end" placeholder="YYYY-MM-DD">
+        <input class="input" id="survey-start" placeholder="YYYY-MM-DD">
+        <input class="input" id="survey-end" placeholder="YYYY-MM-DD">
         <button class="btn btn-primary" id="survey-add" type="button">추가/수정</button>
       </div>
     `;

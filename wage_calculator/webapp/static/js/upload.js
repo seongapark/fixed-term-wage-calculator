@@ -6,6 +6,7 @@ export function render(container) {
   container.innerHTML = `
     <div class="card">
       <h1 class="screen-title">통계조사관 임금계산</h1>
+      <p class="text-muted" style="margin: 0 0 var(--space-4);">※ G드라이브의 예시파일을 참고하셔서 A파일(성명, 주민번호, 은행, 계좌번호), B파일(e-사람 근무상황 추출)을 준비해주세요.</p>
       <div class="form-row">
         <label>개인정보 파일 (A)</label>
         <input class="input" id="a-path" type="text">
@@ -21,7 +22,11 @@ export function render(container) {
         <input class="input" id="prev-path" type="text">
         <button class="btn" id="prev-browse" type="button">찾아보기</button>
       </div>
-      <p class="text-muted" style="margin: 0 0 var(--space-4) 176px;">※ 비워두면 소급계산을 하지 않습니다.</p>
+      <div class="text-muted" style="margin: 0 0 var(--space-4) 176px;">
+        <p style="margin: 0 0 var(--space-1);">※ 3번째 첨부파일(전월 임금내역)을 비워두면 소급계산을 하지 않습니다.</p>
+        <p style="margin: 0 0 var(--space-1);">※ 3번째 첨부파일에는 본 프로그램으로 추출한 전월 임금결과 파일을 넣으시면 됩니다.</p>
+        <p style="margin: 0;">※ 소급적용을 원하시면 e-사람에서 근무상황을 추출할 때 <strong>전월+당월 근무상황을 함께 추출</strong>해 근무상황 파일(B)로 첨부하세요.</p>
+      </div>
       <div class="actions">
         <button class="btn btn-primary" id="next-btn" type="button">다음</button>
       </div>
