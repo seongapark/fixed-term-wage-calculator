@@ -114,12 +114,27 @@ def weekly_holidays_for_month(windows: List[WeeklyWindowResult], year: int, mont
     return sum(1 for w in windows if w.granted and w.accrual_year == year and w.accrual_month == month)
 
 
-def leave_usage_minutes(event) -> int:
-    """연가(월차) 잔량에서 차감되는 분(分). 반일연가도 연가 잔량을 사용함."""
+def _consumes_leave_candidate(event) -> bool:
+    """연가 잔량을 소진하는 후보: 명시적 연가/반일연가 + 조퇴/외출/지각(시간 기재 '기타')."""
+    if event.classified in ("연가", "반일연가"):
+        return True
+    return event.is_time_based and event.classified == "기타"
+
+
+def leave_usage_minutes(event, offset_map=None) -> int:
+    """연가(월차) 잔량에서 차감되는 분(分).
+    - 연가: 시간 기재면 그 분, 아니면 480(종일)
+    - 반일연가: 240
+    - 조퇴/외출/지각(시간 기재 '기타'): offset_map이 주어졌을 때만 그 사건의
+      연가 상계분(covered)을 반환(=연가로 덮은 만큼만 연가를 소진). offset_map이
+      없으면 0(하위호환).
+    """
     if event.classified == "연가":
         return event.minutes if event.is_time_based else 480
     if event.classified == "반일연가":
         return 240
+    if offset_map is not None and event.is_time_based and event.classified == "기타":
+        return offset_map.get(id(event), 0)
     return 0
 
 
@@ -149,7 +164,7 @@ def compute_monthly_leave_windows(contract_start: date, contract_end: date, even
             full_attendance = all(m > 0 for m in by_day.values())
             accrued = full_attendance
 
-        usage = [e for e in window_events if leave_usage_minutes(e) > 0]
+        usage = [e for e in window_events if _consumes_leave_candidate(e)]
 
         results.append(MonthlyWindowResult(
             index=idx, start=w_start, end=nominal_end, effective_end=eff_end,
