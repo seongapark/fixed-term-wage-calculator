@@ -75,7 +75,14 @@ def calc_payroll(person, config, year: int, month: int) -> PayrollResult:
     special_leave_events = [e for e in period_events if e.classified in ("유급특별휴가", "무급특별휴가")]
 
     holidays = config.holidays_in_range(period_start.isoformat(), period_end.isoformat())
-    paid_holiday_days = len(holidays)
+    # 관공서 공휴일(대체공휴일 포함)은 유급휴일이나, 휴무일(주말 등 애초 근로제공
+    # 의무가 없는 날)에 겹친 공휴일은 유급휴일로 처리하지 않는다(고용부 공문).
+    # 근로예정일인 평일 공휴일만 유급휴일로 카운트한다. 총 지급액은 total_days가
+    # networkdays(평일) 기반이라 주말 공휴일을 애초에 포함하지 않으므로 불변이며,
+    # 이 수정은 산정근거의 '유급휴일/실출근' 표기를 공문과 일치시킨다.
+    paid_holiday_days = sum(
+        1 for h in holidays if date_utils.parse_date(h).weekday() < 5
+    )
 
     workdays = date_utils.networkdays(period_start, period_end)
     actual_workdays = workdays - public_leave_days - (paid_holiday_days + absence_days)
