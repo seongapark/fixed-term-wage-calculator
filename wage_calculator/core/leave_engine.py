@@ -176,7 +176,7 @@ def compute_monthly_leave_windows(contract_start: date, contract_end: date, even
     return results
 
 
-def build_leave_ledger(windows: List[MonthlyWindowResult]) -> None:
+def build_leave_ledger(windows: List[MonthlyWindowResult], offset_map=None) -> None:
     """각 구간의 cum_balance_minutes를 '그 구간이 실제로 끝나는 시점' 기준으로 채운다
     (증거자료용 진짜 이력 원장 - 특정 급여계산기간 마감일에 의해 잘리지 않음).
     """
@@ -186,11 +186,11 @@ def build_leave_ledger(windows: List[MonthlyWindowResult]) -> None:
         if w.accrued:
             accrued_minutes += 480
         for e in w.usage_events:
-            used_minutes += leave_usage_minutes(e)
+            used_minutes += leave_usage_minutes(e, offset_map)
         w.cum_balance_minutes = accrued_minutes - used_minutes
 
 
-def leave_balance_minutes_as_of(windows: List[MonthlyWindowResult], as_of: date) -> int:
+def leave_balance_minutes_as_of(windows: List[MonthlyWindowResult], as_of: date, offset_map=None) -> int:
     """as_of 날짜까지(포함) 발생 가능한 연가(구간 종료 다음날부터 가용) - 사용분(분).
 
     급여계산기간 마감일(as_of) 시점의 스냅샷 값으로, 7-4 증거자료의 구간별
@@ -205,7 +205,7 @@ def leave_balance_minutes_as_of(windows: List[MonthlyWindowResult], as_of: date)
             accrued_minutes += 480
         for e in w.usage_events:
             if e.d <= as_of:
-                used_minutes += leave_usage_minutes(e)
+                used_minutes += leave_usage_minutes(e, offset_map)
         if w.start > as_of:
             break
     return accrued_minutes - used_minutes
