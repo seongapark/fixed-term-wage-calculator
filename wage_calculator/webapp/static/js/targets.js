@@ -120,8 +120,9 @@ export async function render(container) {
         openContractPeriodCheckModal(() => {
           openConfirmRunModal(async () => {
             try {
-              const { errors } = await api.calculate();
-              if (errors.length > 0) showWarning(errors.join("\n"));
+              const { errors, leave_warnings } = await api.calculate();
+              const messages = [...errors, ...(leave_warnings || [])];
+              if (messages.length > 0) showWarning(messages.join("\n"));
               navigate("result");
             } catch (e) {
               showError(e.message);
