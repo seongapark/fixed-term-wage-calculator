@@ -782,6 +782,125 @@ git commit -m "feat: 계산 완료 시 연가 부족(조퇴/외출/지각 초과
 
 ---
 
+### Task 7: 공휴일 유급휴일 표기 정정 (휴무일 겹침 제외)
+
+**목적:** 관공서 공휴일 유급 보장(근로기준법 개정)은 유지하되, **휴무일(주말 등 애초 근로제공 의무 없는 날)에 겹친 공휴일은 유급휴일로 카운트하지 않도록** 산정근거 표기를 고용부 공문과 일치시킨다. 이 작업은 연가 상계와 독립적이다.
+
+**배경(공문):** 관공서 공휴일(대체공휴일 포함)은 유급휴일이나, 휴무일 등 애초부터 근로제공이 예정되지 않은 날이 공휴일과 겹치면 그 날을 유급으로 처리하지 않는다. 현재 `paid_holiday_days = len(holidays)`는 주말 공휴일도 카운트해, 산정근거의 "유급휴일" 열이 주말 공휴일을 1일로 잡고 "실출근"을 1일 줄여 표시한다(총 지급액은 `total_days = networkdays − 결근` 이라 주말 공휴일을 애초에 포함하지 않으므로 불변). 이 태스크는 **표기만** 공문과 일치시키며 지급액은 바꾸지 않는다.
+
+**Files:**
+- Modify: `wage_calculator/core/payroll.py:73-74`
+- Test: `wage_calculator/tests/test_payroll_holiday_weekday_only.py` (create)
+
+**Interfaces:**
+- Consumes: `config.holidays_in_range(start_iso, end_iso) -> list[str]`(ISO 날짜 문자열), `date_utils.parse_date`(payroll.py에 이미 import된 `date_utils`).
+- Produces: 동작 변경 없음(내부 계산만). `PayrollResult.paid_holiday_days`가 평일 공휴일 수만 반영.
+
+- [ ] **Step 1: Write the failing test**
+
+`wage_calculator/tests/test_payroll_holiday_weekday_only.py`:
+
+```python
+import sys
+from pathlib import Path
+from datetime import date
+from types import SimpleNamespace
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from core.config import Config
+from core.payroll import calc_payroll
+
+
+def _config(holidays):
+    return Config({"surveys": [], "rates": {"2026": {"daily_wage": 78560, "meal_allowance": 160000}}, "holidays": holidays})
+
+
+def _person():
+    return SimpleNamespace(
+        contract_start=date(2026, 8, 1), contract_end=date(2026, 8, 31), events=[],
+        name="테스트", birth="", ssn="", bank="", account="", survey_name="테스트조사",
+    )
+
+
+def test_weekend_holiday_not_counted_as_paid_holiday():
+    """2026-08-15는 토요일(휴무일). 유급휴일로 잡히면 안 되고 실출근도 안 줄어야 한다."""
+    r = calc_payroll(_person(), _config(["2026-08-15"]), 2026, 8)
+    assert r.paid_holiday_days == 0
+    assert r.actual_workdays == 21   # 8월 평일 21일 전부 실출근
+    assert r.total_days == 21
+
+
+def test_weekday_holiday_counted_as_paid_holiday():
+    """2026-08-17은 월요일(근로예정일). 유급휴일 1일로 잡히고 실출근은 20."""
+    r = calc_payroll(_person(), _config(["2026-08-17"]), 2026, 8)
+    assert r.paid_holiday_days == 1
+    assert r.actual_workdays == 20
+    assert r.total_days == 21
+
+
+def test_total_pay_unchanged_by_weekend_holiday():
+    """주말 공휴일 유무로 지급액(total_days 기반)은 변하지 않는다."""
+    r_none = calc_payroll(_person(), _config([]), 2026, 8)
+    r_sat = calc_payroll(_person(), _config(["2026-08-15"]), 2026, 8)
+    assert r_none.total_days == r_sat.total_days == 21
+    assert r_none.gross_pay == r_sat.gross_pay
+
+
+if __name__ == "__main__":
+    test_weekend_holiday_not_counted_as_paid_holiday()
+    test_weekday_holiday_counted_as_paid_holiday()
+    test_total_pay_unchanged_by_weekend_holiday()
+    print("ALL OK")
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `python -m pytest tests/test_payroll_holiday_weekday_only.py -q`
+Expected: FAIL (`test_weekend_holiday_not_counted_as_paid_holiday`에서 paid_holiday_days==1, actual_workdays==20으로 나와 단언 실패)
+
+- [ ] **Step 3: Implement**
+
+`payroll.py`의 기존:
+
+```python
+    holidays = config.holidays_in_range(period_start.isoformat(), period_end.isoformat())
+    paid_holiday_days = len(holidays)
+```
+
+교체:
+
+```python
+    holidays = config.holidays_in_range(period_start.isoformat(), period_end.isoformat())
+    # 관공서 공휴일(대체공휴일 포함)은 유급휴일이나, 휴무일(주말 등 애초 근로제공
+    # 의무가 없는 날)에 겹친 공휴일은 유급휴일로 처리하지 않는다(고용부 공문).
+    # 근로예정일인 평일 공휴일만 유급휴일로 카운트한다. 총 지급액은 total_days가
+    # networkdays(평일) 기반이라 주말 공휴일을 애초에 포함하지 않으므로 불변이며,
+    # 이 수정은 산정근거의 '유급휴일/실출근' 표기를 공문과 일치시킨다.
+    paid_holiday_days = sum(
+        1 for h in holidays if date_utils.parse_date(h).weekday() < 5
+    )
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `python -m pytest tests/test_payroll_holiday_weekday_only.py -q`
+Expected: PASS (3 passed)
+
+- [ ] **Step 5: Run regression**
+
+Run: `python -m pytest tests/ -q`
+Expected: 이전 합계 + 3 passed. (기존 webapp 픽스처의 "2026-08-15"(토) 공휴일은 paid_holiday_days 값을 단언하지 않으므로 회귀 없음. 만약 어떤 테스트가 깨지면 그 테스트가 주말 공휴일을 유급휴일로 기대하던 것 — 공문에 맞게 기대값을 0으로 갱신.)
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add wage_calculator/core/payroll.py wage_calculator/tests/test_payroll_holiday_weekday_only.py
+git commit -m "fix: 휴무일(주말)에 겹친 공휴일을 유급휴일로 카운트하지 않도록 표기 정정"
+```
+
+---
+
 ## Self-Review
 
 **Spec coverage:**
@@ -793,6 +912,7 @@ git commit -m "feat: 계산 완료 시 연가 부족(조퇴/외출/지각 초과
 - 원장 정합 → Task 3(build_leave_ledger/balance offset) + Task 5(증거자료 offset_map). ✅
 - 입력 데이터 요건(계약 전체 커버) → 코드는 이미 `person.events` 통째 사용, 별도 배관 변경 불필요(문서화 완료). ✅
 - 경고 위치=계산 시 팝업 → Task 6. ✅
+- 공휴일 유급 처리(공문): 지급액은 기존에도 준수(주말 공휴일 미가산). 산정근거 '유급휴일' 표기를 평일 공휴일만 카운트하도록 정정 → Task 7. ✅ (연가 상계와 독립)
 
 **Placeholder scan:** 모든 코드 스텝에 실제 코드/명령/기대출력 포함. TBD/TODO 없음. ✅
 
