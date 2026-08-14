@@ -123,10 +123,6 @@ def leave_usage_minutes(event) -> int:
     return 0
 
 
-def _breaks_full_attendance(events) -> bool:
-    return any(e.breaks for e in events)
-
-
 def compute_monthly_leave_windows(contract_start: date, contract_end: date, events) -> List[MonthlyWindowResult]:
     """5-3: 계약시작일과 같은 날짜의 전날까지를 1개월 만근구간으로 반복 판정.
 
@@ -146,7 +142,11 @@ def compute_monthly_leave_windows(contract_start: date, contract_end: date, even
             full_attendance = False
             accrued = False
         else:
-            full_attendance = not _breaks_full_attendance(window_events)
+            # 5-3 만근도 5-1(주휴)과 동일 기준: 하루 통으로 빠진 날(실근무 0분 -
+            # 결근·종일병가 또는 조퇴/외출로 8시간 전부 공제)이 하나도 없어야 만근.
+            # 조퇴/지각/외출로 일부 시간만 비운 날은 출근한 날로 인정한다.
+            by_day = _worked_minutes_by_day(window_events, w_start, eff_end)
+            full_attendance = all(m > 0 for m in by_day.values())
             accrued = full_attendance
 
         usage = [e for e in window_events if leave_usage_minutes(e) > 0]

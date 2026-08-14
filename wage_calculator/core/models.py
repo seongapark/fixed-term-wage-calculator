@@ -16,7 +16,7 @@ class LeaveEvent:
     time_end: Optional[time] = None
     minutes: int = 0          # 조퇴/지각/외출 공제 분
     day_weight: float = 1.0   # 종일 기준 일수(반일연가=0.5, 조퇴/지각/외출=0)
-    breaks: bool = False      # 5-1/5-3 판정을 깨는 사유인지
+    breaks: bool = False      # (미사용) 과거 5-3 만근 판정용. 현재 5-1/5-3 모두 실근무 0분 기준(_worked_minutes_by_day)으로 판정해 소비되지 않음.
     source_range: Optional[Tuple[date, date]] = None  # (원본 B파일 행의 사용기간 시작일, 종료일) - 같은 행에서 펼쳐진 이벤트 그룹 식별용
 
 

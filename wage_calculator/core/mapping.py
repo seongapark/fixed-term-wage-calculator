@@ -57,7 +57,9 @@ def full_day_weight(raw_category: str) -> float:
 
 
 def full_day_breaks(raw_category: str) -> bool:
-    """사용시간(시분) 미기재(종일) 항목이 5-1(주휴)/5-3(연가 만근) 판정을 깨는지.
+    """(미사용) 종일 항목이 만근 판정을 깨는지 - LeaveEvent.breaks 설정용이었으나,
+    현재 5-1(주휴)/5-3(연가) 판정 모두 그날 실근무 0분 여부(_worked_minutes_by_day)로
+    통일되어 이 함수의 결과는 더 이상 소비되지 않는다.
 
     - 결근(전일) -> 깨짐
     - 병가(전일, 진단서 미첨부/첨부) -> 깨짐
