@@ -120,7 +120,7 @@ def create_app(state: Optional[AppState] = None) -> FastAPI:
     @app.post("/api/calculate")
     def calculate():
         errors = state.run_calculation()
-        return {"errors": errors}
+        return {"errors": errors, "leave_warnings": state.leave_warnings}
 
     @app.get("/api/results")
     def get_results():

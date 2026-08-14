@@ -98,6 +98,7 @@ class AppState:
         self.retro_details = {}
         self.departed_results = []
         self.pending_leave_groups = []
+        self.leave_warnings = []
 
     def reset(self):
         self._reset_data()
@@ -238,6 +239,17 @@ class AppState:
                 errors.extend(retro.errors)
             except Exception as e:
                 errors.append(f"소급계산 오류: {e}")
+
+        self.leave_warnings = []
+        for r in self.results:
+            if getattr(r, "leave_shortfall", False):
+                used_h = round((r.leave_offset_minutes + r.leave_shortfall_minutes) / 60, 2)
+                offset_h = round(r.leave_offset_minutes / 60, 2)
+                excess_h = round(r.leave_shortfall_minutes / 60, 2)
+                self.leave_warnings.append(
+                    f"{r.name}: 조퇴/외출/지각 {used_h}시간 중 {offset_h}시간은 연가로 상계, "
+                    f"초과 {excess_h}시간은 급여에서 공제됩니다."
+                )
         return errors
 
     def results_summary(self):
@@ -342,17 +354,18 @@ class AppState:
             "meal_eligible_days": result.meal_eligible_days,
         }
 
+        offset_map = getattr(result, "leave_offset_map", {})
         leave_rows = []
         for w in result.monthly_windows:
             if w.start > result.period_end:
                 continue
             usage_text = ", ".join(
-                f"{e.d.strftime('%m-%d')}:{leave_usage_minutes(e)}" for e in w.usage_events
+                f"{e.d.strftime('%m-%d')}:{leave_usage_minutes(e, offset_map)}" for e in w.usage_events
             )
             concluded = w.effective_end <= result.period_end
             status = ("만근" if w.full_attendance else ("기간중 종료" if w.truncated else "미만근")) if concluded else "진행중"
             as_of = min(w.effective_end, result.period_end)
-            balance_at_row = leave_engine.leave_balance_minutes_as_of(result.monthly_windows, as_of)
+            balance_at_row = leave_engine.leave_balance_minutes_as_of(result.monthly_windows, as_of, offset_map)
             leave_rows.append({
                 "index": w.index,
                 "start": w.start.isoformat(),
