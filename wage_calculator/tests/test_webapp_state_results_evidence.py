@@ -63,6 +63,7 @@ def test_evidence_for_known_person_has_all_sections():
     data = state.evidence_for(key)
     assert set(data.keys()) == {
         "raw_rows", "weekly", "late_out", "late_out_total_minutes",
+        "late_out_used_total_minutes", "late_out_offset_total_minutes",
         "meal", "leave", "leave_final",
     }
     assert isinstance(data["raw_rows"], list)

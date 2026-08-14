@@ -242,7 +242,9 @@ class AppState:
 
         self.leave_warnings = []
         for r in self.results:
-            if getattr(r, "leave_shortfall", False):
+            # 연가가 실제로 상계된(offset>0) 경우에만 부족 경고를 띄운다. 발생 전(보유
+            # 연가 0)이라 상계 없이 종전처럼 급여 공제만 된 경우는 조용히 처리한다.
+            if getattr(r, "leave_shortfall", False) and r.leave_offset_minutes > 0:
                 used_h = round((r.leave_offset_minutes + r.leave_shortfall_minutes) / 60, 2)
                 offset_h = round(r.leave_offset_minutes / 60, 2)
                 excess_h = round(r.leave_shortfall_minutes / 60, 2)
@@ -336,14 +338,20 @@ class AppState:
             "reason": w.reason,
         } for w in result.weekly_windows]
 
-        late_out = [{
-            "date": e.d.isoformat(),
-            "category": e.raw_category,
-            "start": e.time_start.strftime("%H:%M"),
-            "end": e.time_end.strftime("%H:%M"),
-            "lunch_included": "포함" if (e.time_start < date_utils.LUNCH_START and e.time_end > date_utils.LUNCH_END) else "미포함",
-            "minutes": e.minutes,
-        } for e in result.late_out_events]
+        offset_map = getattr(result, "leave_offset_map", {})
+        late_out = []
+        for e in result.late_out_events:
+            covered = offset_map.get(id(e), 0)
+            late_out.append({
+                "date": e.d.isoformat(),
+                "category": e.raw_category,
+                "start": e.time_start.strftime("%H:%M"),
+                "end": e.time_end.strftime("%H:%M"),
+                "lunch_included": "포함" if (e.time_start < date_utils.LUNCH_START and e.time_end > date_utils.LUNCH_END) else "미포함",
+                "minutes": e.minutes,
+                "offset_minutes": covered,
+                "deducted_minutes": e.minutes - covered,
+            })
 
         total_days = (result.period_end - result.period_start).days + 1
         meal = {
@@ -354,7 +362,6 @@ class AppState:
             "meal_eligible_days": result.meal_eligible_days,
         }
 
-        offset_map = getattr(result, "leave_offset_map", {})
         leave_rows = []
         for w in result.monthly_windows:
             if w.start > result.period_end:
@@ -384,6 +391,8 @@ class AppState:
             "raw_rows": raw_rows,
             "weekly": weekly,
             "late_out": late_out,
+            "late_out_used_total_minutes": sum(e.minutes for e in result.late_out_events),
+            "late_out_offset_total_minutes": result.leave_offset_minutes,
             "late_out_total_minutes": result.late_out_minutes,
             "meal": meal,
             "leave": leave_rows,

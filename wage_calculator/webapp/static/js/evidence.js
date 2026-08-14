@@ -68,9 +68,9 @@ export async function render(container, params) {
         data.weekly.map(w => `<tr><td>${w.index}</td><td>${escapeHtml(w.start)}</td><td>${escapeHtml(w.effective_end)}</td><td>${w.workdays}</td><td>${w.absence_days}</td><td>${w.public_leave_days}</td><td>${w.sick_full_days}</td><td>${w.granted ? "O" : "X"}</td><td>${escapeHtml(w.reason)}</td></tr>`).join("")
       }</tbody></table>`;
     } else if (tab === "lateout") {
-      body.innerHTML = `<table class="table"><thead><tr><th>날짜</th><th>종별</th><th>시작</th><th>종료</th><th>점심포함</th><th>공제(분)</th></tr></thead><tbody>${
-        data.late_out.map(e => `<tr><td>${escapeHtml(e.date)}</td><td>${escapeHtml(e.category)}</td><td>${escapeHtml(e.start)}</td><td>${escapeHtml(e.end)}</td><td>${e.lunch_included}</td><td>${e.minutes}</td></tr>`).join("")
-      }<tr><td></td><td></td><td></td><td></td><td>합계(분)</td><td>${data.late_out_total_minutes}</td></tr></tbody></table>`;
+      body.innerHTML = `<table class="table"><thead><tr><th>날짜</th><th>종별</th><th>시작</th><th>종료</th><th>점심포함</th><th>사용(분)</th><th>연가상계(분)</th><th>급여공제(분)</th></tr></thead><tbody>${
+        data.late_out.map(e => `<tr><td>${escapeHtml(e.date)}</td><td>${escapeHtml(e.category)}</td><td>${escapeHtml(e.start)}</td><td>${escapeHtml(e.end)}</td><td>${e.lunch_included}</td><td>${e.minutes}</td><td>${e.offset_minutes}</td><td>${e.deducted_minutes}</td></tr>`).join("")
+      }<tr><td></td><td></td><td></td><td></td><td>합계(분)</td><td>${data.late_out_used_total_minutes}</td><td>${data.late_out_offset_total_minutes}</td><td>${data.late_out_total_minutes}</td></tr></tbody></table>`;
     } else if (tab === "meal") {
       const m = data.meal;
       body.innerHTML = `<table class="table"><thead><tr><th>급여계산기간 시작</th><th>급여계산기간 종료</th><th>총일수</th><th>결근일수</th><th>식대해당일</th></tr></thead><tbody>
