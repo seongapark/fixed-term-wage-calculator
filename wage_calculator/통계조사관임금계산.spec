@@ -38,7 +38,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='통계조사관임금계산_v5.3',
+    name='통계조사관임금계산_v5.4',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

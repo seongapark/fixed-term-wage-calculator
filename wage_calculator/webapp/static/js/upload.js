@@ -25,7 +25,7 @@ export function render(container) {
       <div class="text-muted" style="margin: 0 0 var(--space-4) 176px;">
         <p style="margin: 0 0 var(--space-1);">※ 3번째 첨부파일(전월 임금내역)을 비워두면 소급계산을 하지 않습니다.</p>
         <p style="margin: 0 0 var(--space-1);">※ 3번째 첨부파일에는 본 프로그램으로 추출한 전월 임금결과 파일을 넣으시면 됩니다.</p>
-        <p style="margin: 0;">※ 소급적용을 원하시면 e-사람에서 근무상황을 추출할 때 <strong>전월+당월 근무상황을 함께 추출</strong>해 근무상황 파일(B)로 첨부하세요.</p>
+        <p style="margin: 0;">※ 근무상황 파일(B)은 <strong>계약 전체 기간</strong>(계약 시작월~당월)을 추출해 첨부하세요. 연가 잔량이 계약 전체의 만근·사용 이력에 의존하므로, 일부 기간만 넣으면 연가·소급 계산이 부정확해질 수 있습니다.</p>
       </div>
       <div class="actions">
         <button class="btn btn-primary" id="next-btn" type="button">다음</button>
