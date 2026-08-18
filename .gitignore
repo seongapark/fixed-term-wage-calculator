@@ -10,3 +10,5 @@ config.json
 .superpowers/
 *.cab
 wage_calculator/webview2_fixedversion/
+*.m4v
+demo_assets/
