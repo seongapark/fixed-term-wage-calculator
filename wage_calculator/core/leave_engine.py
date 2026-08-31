@@ -115,7 +115,14 @@ def weekly_holidays_for_month(windows: List[WeeklyWindowResult], year: int, mont
 
 
 def _consumes_leave_candidate(event) -> bool:
-    """연가 잔량을 소진하는 후보: 명시적 연가/반일연가 + 조퇴/외출/지각(시간 기재 '기타')."""
+    """연가 잔량을 소진하는 후보: 명시적 연가/반일연가 + 조퇴/외출/지각(시간 기재 '기타').
+
+    결근은 제외한다. e-사람 "근무상황 종별 안내"표에는 결근이 연가일수 '공제'로
+    되어 있으나 그것은 공무원 복무 기준이고, 여기서는 결근이 무단결근이라
+    그날 일급·정액급식비를 아예 지급하지 않는다(payroll.absence_days).
+    급여를 깎으면서 연가까지 깎으면 같은 하루로 두 번 불이익을 주게 되므로,
+    결근은 급여에서만 처리하고 연가 잔량은 건드리지 않는다.
+    """
     if event.classified in ("연가", "반일연가"):
         return True
     return event.is_time_based and event.classified == "기타"

@@ -3,6 +3,7 @@ import tkinter as tk
 from datetime import date
 from tkinter import messagebox, ttk
 
+from core import coverage
 from core.parser import display_label
 from .tree_utils import autosize_columns
 
@@ -164,6 +165,17 @@ class TargetScreen(ttk.Frame):
                 raise ValueError
         except ValueError:
             messagebox.showerror("입력 오류", "급여산정 연/월을 올바르게 입력하세요.")
+            return
+
+        # 연가·주휴는 계약 시작일부터 누적 판정하므로, 계약 시작월부터 계산월까지
+        # 근무상황이 전부 있어야 한다. 빠진 달이 있으면 그 달이 '만근'으로 잘못
+        # 처리되므로 계산 자체를 막는다.
+        gaps = coverage.find_coverage_gaps(self.app.people, self.app.giganje_rows, year, month)
+        if gaps:
+            messagebox.showerror(
+                "근무상황 기간 부족",
+                coverage.format_gap_message(gaps, self.app.giganje_rows, year, month),
+            )
             return
 
         unassigned = [p.name for p in self.app.people.values() if not p.survey_name]

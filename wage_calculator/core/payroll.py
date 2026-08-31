@@ -96,12 +96,25 @@ def calc_payroll(person, config, year: int, month: int) -> PayrollResult:
     remaining_leave_days = balance_minutes / 480
 
     late_out_events = [e for e in period_events if e.is_time_based]
-    # 급여 공제분 = 전체 시간공제분 - 연가로 상계된 조퇴/외출/지각 분
+    # 시간 기재 항목 중 급여에서 깎으면 안 되는 사유 - 그날 비운 시간의 대가를
+    # 이미 다른 방식으로 치렀거나(연가 소진), 애초에 유급이기 때문이다.
+    #   - 연가/반일연가(예: "조퇴(연가처리)"): 연가 잔량에서 그 분만큼 이미
+    #     차감된다(leave_usage_minutes). 급여까지 깎으면 같은 시간을 두 번
+    #     받아내는 셈이라, 세부선택 없이 "조퇴"로만 찍은 사람보다 손해가 된다.
+    #   - 병가(예: "조퇴(일반병가,진단서미첨부)"): 안내표상 연가일수 미공제이고,
+    #     종일 병가가 유급인 것과 같은 기준이어야 한다(누계 8시간 = 병가 1일).
+    #   - 유급특별휴가(예: "지각(공무상병가)"를 확인 화면에서 유급으로 고른 경우):
+    #     유급으로 지정해 놓고 그 시간을 급여에서 깎으면 앞뒤가 안 맞는다.
+    #     무급으로 고른 건은 그대로 공제된다(무급 = 결근과 동일 처리).
+    NON_DEDUCTIBLE = ("연가", "반일연가", "병가", "유급특별휴가")
+    # 급여 공제분 = 공제 대상 시간분 - 연가로 상계된 조퇴/외출/지각('기타') 분
     gita_covered = sum(
         offset_map.get(id(e), 0)
         for e in late_out_events if e.classified == "기타"
     )
-    late_out_minutes = sum(e.minutes for e in late_out_events) - gita_covered
+    late_out_minutes = sum(
+        e.minutes for e in late_out_events if e.classified not in NON_DEDUCTIBLE
+    ) - gita_covered
     gita_used = sum(e.minutes for e in late_out_events if e.classified == "기타")
     leave_offset_minutes = gita_covered
     leave_shortfall_minutes = gita_used - gita_covered
@@ -161,16 +174,18 @@ def _format_special_leave_note(events) -> str:
     groups = {}
     order = []
     for e in events:
-        key = (e.classified, e.source_range)
+        # 원본 종별을 키에 포함해, 같은 기간에 종별이 다른 두 건이 한 줄로
+        # 합쳐지지 않게 한다(비고에도 원본 종별을 그대로 적어 준다).
+        key = (e.classified, e.source_range, e.raw_category)
         if key not in groups:
             groups[key] = []
             order.append(key)
         groups[key].append(e.d)
     order.sort(key=lambda key: min(groups[key]))
     parts = []
-    for classified, source_range in order:
+    for classified, source_range, raw_category in order:
         label = "유급" if classified == "유급특별휴가" else "무급"
-        dates = sorted(groups[(classified, source_range)])
+        dates = sorted(groups[(classified, source_range, raw_category)])
         # 날짜가 전부 연속(하루 간격)일 때만 "~" 범위로 표시한다. 주말이 낀
         # 경우처럼 중간이 비면 실제 사용일만 콤마로 나열해, 쉬지 않은 날까지
         # 포함된 것처럼 보이는 걸 막는다.
@@ -184,7 +199,7 @@ def _format_special_leave_note(events) -> str:
             date_text = f"{start.month}/{start.day}~{end.month}/{end.day}"
         else:
             date_text = ", ".join(f"{d.month}/{d.day}" for d in dates)
-        parts.append(f"특별휴가({label}) {date_text}")
+        parts.append(f"{raw_category or '특별휴가'}({label}) {date_text}")
     return ", ".join(parts)
 
 

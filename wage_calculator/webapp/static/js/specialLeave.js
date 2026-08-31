@@ -19,14 +19,15 @@ export async function render(container) {
   container.innerHTML = `
     <div class="card">
       <div class="title-row">
-        <h1 class="screen-title" style="margin:0;">특별휴가 유급/무급 확인</h1>
+        <h1 class="screen-title" style="margin:0;">유급/무급 확인</h1>
         <span class="info-icon" id="guide-icon">ⓘ</span>
       </div>
       <div class="info-panel" id="guide-panel"></div>
-      <p class="screen-subtitle">근무상황 파일에 "특별휴가"로만 기록되어 유급/무급을 알 수 없는 건입니다.
+      <p class="screen-subtitle">종별만으로는 유급/무급을 정할 수 없는 건입니다(경조사·출산·돌봄·포상 등 특별휴가, 그리고 청·지청 표기가 달라 프로그램이 알아보지 못한 종별).
+"종별(원본)" 칸에 근무상황 파일에 적힌 문자열을 그대로 보여주니 이를 보고 판단하세요.
 행을 클릭하면 미정 → 유급 → 무급 순으로 바뀝니다. 모두 지정해야 다음으로 진행됩니다.</p>
       <table class="table">
-        <thead><tr><th>성명</th><th>기간</th><th>사유(원본)</th><th>비고(원본)</th><th>유급/무급</th></tr></thead>
+        <thead><tr><th>성명</th><th>종별(원본)</th><th>기간</th><th>사유(원본)</th><th>비고(원본)</th><th>유급/무급</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
       <div class="actions">
@@ -66,6 +67,7 @@ export async function render(container) {
       const cls = status === "유급특별휴가" ? "paid" : status === "무급특별휴가" ? "unpaid" : "";
       return `<tr>
         <td>${escapeHtml(g.person_name)}</td>
+        <td>${escapeHtml(g.raw_category || "")}</td>
         <td>${escapeHtml(period)}</td>
         <td>${escapeHtml(g.reason)}</td>
         <td>${escapeHtml(g.note)}</td>

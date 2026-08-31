@@ -28,12 +28,12 @@ def test_bare_early_leave_categories_classify_as_other():
     print("OK: test_bare_early_leave_categories_classify_as_other")
 
 
-def test_unknown_category_still_raises():
-    try:
-        mapping.classify("존재하지않는종별")
-        raise AssertionError("ValueError가 발생했어야 함")
-    except ValueError:
-        print("OK: test_unknown_category_still_raises")
+def test_unknown_category_becomes_pending():
+    # 청·지청마다 종별 표기가 달라, 못 알아본 종별로 계산을 중단시키지 않는다.
+    # 대신 "특별휴가_미정"으로 확인 화면에 올려 사람이 유급/무급을 정하게 한다.
+    assert mapping.classify("존재하지않는종별") == "특별휴가_미정"
+    assert mapping.is_pending("특별휴가_미정") is True
+    print("OK: test_unknown_category_becomes_pending")
 
 
 if __name__ == "__main__":
@@ -41,5 +41,5 @@ if __name__ == "__main__":
     test_special_leave_does_not_break_attendance()
     test_special_leave_full_day_weight_is_one()
     test_bare_early_leave_categories_classify_as_other()
-    test_unknown_category_still_raises()
+    test_unknown_category_becomes_pending()
     print("ALL OK")
