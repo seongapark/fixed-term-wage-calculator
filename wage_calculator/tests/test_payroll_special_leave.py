@@ -49,12 +49,12 @@ def test_special_leave_folds_into_buckets_and_note():
     events += [build_event("결근", d) for d in (a1, a2)]
     events += [
         LeaveEvent(raw_category="특별휴가", classified="유급특별휴가", d=d, is_time_based=False,
-                   day_weight=1.0, breaks=False, source_range=(p1, p2))
+                   day_weight=1.0, unpaid=False, breaks=False, source_range=(p1, p2))
         for d in (p1, p2)
     ]
     events.append(
         LeaveEvent(raw_category="특별휴가", classified="무급특별휴가", d=u1, is_time_based=False,
-                   day_weight=1.0, breaks=False, source_range=(u1, u1))
+                   day_weight=1.0, unpaid=True, breaks=False, source_range=(u1, u1))
     )
 
     r = calc_payroll(_person(events), _config(), 2026, 7)

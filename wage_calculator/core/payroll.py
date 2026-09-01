@@ -3,7 +3,7 @@ import math
 from dataclasses import dataclass, field
 from datetime import date
 
-from . import date_utils, leave_engine
+from . import date_utils, leave_engine, mapping
 
 
 def round_down(x, unit=1):
@@ -71,7 +71,9 @@ def calc_payroll(person, config, year: int, month: int) -> PayrollResult:
     period_events = [e for e in person.events if period_start <= e.d <= period_end]
 
     public_leave_days = sum(e.day_weight for e in period_events if e.classified in ("공가", "유급특별휴가"))
-    absence_days = sum(e.day_weight for e in period_events if e.classified in ("결근", "무급특별휴가"))
+    # 급여·식대를 아예 지급하지 않는 종일 항목(결근·종일 기타, 그리고 확인 화면에서
+    # '무급'으로 고른 종일 건). 시간 기재 항목은 일수가 아니라 분 단위로 아래에서 깎는다.
+    absence_days = sum(e.day_weight for e in period_events if e.unpaid and not e.is_time_based)
     special_leave_events = [e for e in period_events if e.classified in ("유급특별휴가", "무급특별휴가")]
 
     holidays = config.holidays_in_range(period_start.isoformat(), period_end.isoformat())
@@ -96,28 +98,22 @@ def calc_payroll(person, config, year: int, month: int) -> PayrollResult:
     remaining_leave_days = balance_minutes / 480
 
     late_out_events = [e for e in period_events if e.is_time_based]
-    # 시간 기재 항목 중 급여에서 깎으면 안 되는 사유 - 그날 비운 시간의 대가를
-    # 이미 다른 방식으로 치렀거나(연가 소진), 애초에 유급이기 때문이다.
-    #   - 연가/반일연가(예: "조퇴(연가처리)"): 연가 잔량에서 그 분만큼 이미
-    #     차감된다(leave_usage_minutes). 급여까지 깎으면 같은 시간을 두 번
-    #     받아내는 셈이라, 세부선택 없이 "조퇴"로만 찍은 사람보다 손해가 된다.
-    #   - 병가(예: "조퇴(일반병가,진단서미첨부)"): 안내표상 연가일수 미공제이고,
-    #     종일 병가가 유급인 것과 같은 기준이어야 한다(누계 8시간 = 병가 1일).
-    #   - 유급특별휴가(예: "지각(공무상병가)"를 확인 화면에서 유급으로 고른 경우):
-    #     유급으로 지정해 놓고 그 시간을 급여에서 깎으면 앞뒤가 안 맞는다.
-    #     무급으로 고른 건은 그대로 공제된다(무급 = 결근과 동일 처리).
-    NON_DEDUCTIBLE = ("연가", "반일연가", "병가", "유급특별휴가")
-    # 급여 공제분 = 공제 대상 시간분 - 연가로 상계된 조퇴/외출/지각('기타') 분
-    gita_covered = sum(
+    # 급여에서 깎을지는 종별 문자열이 아니라 이벤트의 unpaid 축이 정한다.
+    #   - 연가/반일연가: 연가 잔량에서 이미 그 분만큼 차감된다(leave_usage_minutes).
+    #     급여까지 깎으면 같은 시간을 두 번 받아내는 셈이다.
+    #   - 일반병가: 종일 병가가 유급인 것과 같은 기준이어야 한다.
+    #   - 확인 화면에서 '유급'으로 고른 건: 유급으로 지정해 놓고 깎으면 앞뒤가 안 맞는다.
+    # 조퇴/외출/지각은 보유 연가로 상계된 만큼만 급여에서 빠진다. 기타는 상계하지 않는다.
+    offset_covered = sum(
         offset_map.get(id(e), 0)
-        for e in late_out_events if e.classified == "기타"
+        for e in late_out_events if e.classified in mapping.OFFSETTABLE
     )
-    late_out_minutes = sum(
-        e.minutes for e in late_out_events if e.classified not in NON_DEDUCTIBLE
-    ) - gita_covered
-    gita_used = sum(e.minutes for e in late_out_events if e.classified == "기타")
-    leave_offset_minutes = gita_covered
-    leave_shortfall_minutes = gita_used - gita_covered
+    late_out_minutes = sum(e.minutes for e in late_out_events if e.unpaid) - offset_covered
+    offsettable_used = sum(
+        e.minutes for e in late_out_events if e.classified in mapping.OFFSETTABLE
+    )
+    leave_offset_minutes = offset_covered
+    leave_shortfall_minutes = offsettable_used - offset_covered
     leave_shortfall = leave_shortfall_minutes > 0
 
     weekly_windows = leave_engine.compute_weekly_holiday_windows(contract_start, contract_end, person.events)

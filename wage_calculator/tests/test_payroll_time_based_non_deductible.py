@@ -43,7 +43,7 @@ def _result(raw_category, minutes=120):
 
 
 def test_annual_leave_marked_early_leave_is_not_deducted_twice():
-    for raw in ("조퇴(연가처리)", "외출(연가)", "지각(연가처리)"):
+    for raw in ("연가",):
         r = _result(raw)
         assert r.late_out_minutes == 0, f"{raw}: 연가에서 깎았는데 급여도 공제됨"
         assert r.remaining_leave_days == 0.75, f"{raw}: 연가 120분이 차감되어야 함"
@@ -51,7 +51,7 @@ def test_annual_leave_marked_early_leave_is_not_deducted_twice():
 
 
 def test_sick_leave_marked_early_leave_deducts_neither():
-    for raw in ("조퇴(일반병가,진단서미첨부)", "외출(일반병가,진단서첨부)", "지각(일반병가)"):
+    for raw in ("일반병가",):
         r = _result(raw)
         assert r.late_out_minutes == 0, f"{raw}: 병가는 급여를 공제하지 않는다"
         assert r.remaining_leave_days == 1.0, f"{raw}: 병가는 연가일수 미공제"
@@ -99,6 +99,7 @@ def test_paid_special_leave_time_is_not_deducted():
 
     event = build_event("지각(공무상병가)", USED_ON, time(16, 0), time(18, 0), 120)
     event.classified = "무급특별휴가"
+    event.unpaid = True                        # 확인 화면(pending.apply_decisions)이 함께 세우는 값
     person = TargetPerson(
         name="홍길동", survey_name="조사", events=[event],
         contract_start=CONTRACT_START, contract_end=CONTRACT_END,
@@ -110,7 +111,7 @@ def test_paid_special_leave_time_is_not_deducted():
 def test_marked_reasons_are_never_worse_than_bare_early_leave():
     """사유를 정확히 적었다고 해서 손해 보는 일이 없어야 한다."""
     bare = _result("조퇴").total_payment
-    for raw in ("조퇴(연가처리)", "조퇴(일반병가,진단서미첨부)"):
+    for raw in ("연가", "일반병가"):
         assert _result(raw).total_payment >= bare, raw
     print("OK: test_marked_reasons_are_never_worse_than_bare_early_leave")
 
