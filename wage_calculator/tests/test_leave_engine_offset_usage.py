@@ -33,7 +33,7 @@ def test_leave_usage_minutes_late_out_uses_offset_map():
 def test_leave_usage_minutes_explicit_leave_unchanged():
     """명시적 연가는 offset_map과 무관하게 종전 동작."""
     full = build_event("연가", date(2026, 7, 6))
-    half = build_event("반일연가(오전)", date(2026, 7, 7))
+    half = build_event("반일연가", date(2026, 7, 7))
     assert leave_engine.leave_usage_minutes(full) == 480
     assert leave_engine.leave_usage_minutes(half, {}) == 240
 

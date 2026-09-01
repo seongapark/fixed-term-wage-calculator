@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import List, Optional
 
-from . import date_utils
+from . import date_utils, mapping
 
 
 @dataclass
@@ -40,19 +40,19 @@ def _events_in_range(events, start: date, end: date):
 
 
 def _worked_minutes_by_day(window_events, w_start: date, eff_end: date) -> dict:
-    """창 내 월~금 각 날짜의 실근무시간(분). 전일 결근/병가(종일)는 0분,
-    그 외 날은 소정근로 480분에서 그날의 조퇴/지각/외출(시간 기재분, 사유 무관 -
-    "기타"로 등록된 경우 포함) 공제분만큼만 뺀다. 8시간(480분) 전부가 공제되면
-    그날은 사실상 출근하지 않은 것과 같아 0분으로 처리된다."""
+    """창 내 월~금 각 날짜의 실근무시간(분).
+
+    그날을 통으로 비운 이벤트(e.breaks - 종일 결근/일반병가/기타, 또는 확인 화면에서
+    사람이 '주휴·연가 발생 안 함'을 고른 건)가 있으면 0분. 그 외의 날은 소정근로
+    480분에서 그날의 시간 기재분(사유 무관)만큼만 뺀다. 8시간(480분) 전부가
+    공제되면 그날은 사실상 출근하지 않은 것과 같아 0분이 된다.
+    """
     by_day = {}
     for d in date_utils.daterange(w_start, eff_end):
         if d.weekday() >= 5:
             continue
         day_events = [e for e in window_events if e.d == d]
-        full_day_off = any(
-            e.classified in ("결근", "병가") and not e.is_time_based for e in day_events
-        )
-        if full_day_off:
+        if any(e.breaks for e in day_events):
             by_day[d] = 0
         else:
             deducted = sum(e.minutes for e in day_events if e.is_time_based)
@@ -115,9 +115,12 @@ def weekly_holidays_for_month(windows: List[WeeklyWindowResult], year: int, mont
 
 
 def _consumes_leave_candidate(event) -> bool:
-    """연가 잔량을 소진하는 후보: 명시적 연가/반일연가 + 조퇴/외출/지각(시간 기재 '기타').
+    """연가 잔량을 소진하는 후보: 명시적 연가/반일연가 + 조퇴/외출/지각(시간 기재).
 
-    결근은 제외한다. e-사람 "근무상황 종별 안내"표에는 결근이 연가일수 '공제'로
+    "기타"는 제외한다. 기간제 규칙상 기타는 연가 보유 여부와 무관하게 급여에서
+    깎는다 - 상계하면 연가가 조용히 줄어든다.
+
+    결근도 제외한다. e-사람 "근무상황 종별 안내"표에는 결근이 연가일수 '공제'로
     되어 있으나 그것은 공무원 복무 기준이고, 여기서는 결근이 무단결근이라
     그날 일급·정액급식비를 아예 지급하지 않는다(payroll.absence_days).
     급여를 깎으면서 연가까지 깎으면 같은 하루로 두 번 불이익을 주게 되므로,
@@ -125,14 +128,14 @@ def _consumes_leave_candidate(event) -> bool:
     """
     if event.classified in ("연가", "반일연가"):
         return True
-    return event.is_time_based and event.classified == "기타"
+    return event.is_time_based and event.classified in mapping.OFFSETTABLE
 
 
 def leave_usage_minutes(event, offset_map=None) -> int:
     """연가(월차) 잔량에서 차감되는 분(分).
     - 연가: 시간 기재면 그 분, 아니면 480(종일)
     - 반일연가: 240
-    - 조퇴/외출/지각(시간 기재 '기타'): offset_map이 주어졌을 때만 그 사건의
+    - 조퇴/외출/지각(시간 기재): offset_map이 주어졌을 때만 그 사건의
       연가 상계분(covered)을 반환(=연가로 덮은 만큼만 연가를 소진). offset_map이
       없으면 0(하위호환).
     """
@@ -140,7 +143,7 @@ def leave_usage_minutes(event, offset_map=None) -> int:
         return event.minutes if event.is_time_based else 480
     if event.classified == "반일연가":
         return 240
-    if offset_map is not None and event.is_time_based and event.classified == "기타":
+    if offset_map is not None and event.is_time_based and event.classified in mapping.OFFSETTABLE:
         return offset_map.get(id(event), 0)
     return 0
 
@@ -225,7 +228,7 @@ class LeaveConsumption:
 
 
 def simulate_leave_consumption(windows, events) -> LeaveConsumption:
-    """계약 전체 이벤트를 날짜순으로 걸으며 조퇴/외출/지각(시간 기재 '기타')의
+    """계약 전체 이벤트를 날짜순으로 걸으며 조퇴/외출/지각(시간 기재)의
     연가 상계분을 산출한다.
 
     타임라인 항목의 정렬 키 (날짜, 종류):
@@ -241,7 +244,7 @@ def simulate_leave_consumption(windows, events) -> LeaveConsumption:
     for e in events:
         if e.classified in ("연가", "반일연가"):
             entries.append((e.d, 1, leave_usage_minutes(e), e))
-        elif e.is_time_based and e.classified == "기타":
+        elif e.is_time_based and e.classified in mapping.OFFSETTABLE:
             entries.append((e.d, 2, e.minutes, e))
     entries.sort(key=lambda x: (x[0], x[1]))
 

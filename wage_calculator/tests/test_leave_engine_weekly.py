@@ -19,7 +19,7 @@ def test_no_15h_reverification():
     for i in range(5):
         d = contract_start + timedelta(days=i)
         # 09:00~15:45 사이 405분을 조퇴/외출로 공제 -> 실근무 75분/일, 주 합계 375분(6.25시간) < 900분(15시간)
-        events.append(build_event("조퇴(연가)", d, time(9, 0), time(15, 45), 405))
+        events.append(build_event("연가", d, time(9, 0), time(15, 45), 405))
     windows = leave_engine.compute_weekly_holiday_windows(contract_start, contract_end, events)
     first = windows[0]
     assert first.granted, f"15시간 미만이어도 개근이면 발생해야 하는데 미발생: {first.reason}"
