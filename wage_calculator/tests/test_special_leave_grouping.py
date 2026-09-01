@@ -5,7 +5,7 @@ from datetime import date
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.models import TargetPerson, LeaveEvent
-from gui.special_leave_screen import collect_pending_groups
+from webapp.state import collect_pending_groups
 
 
 def test_same_source_range_merges_into_one_group():
