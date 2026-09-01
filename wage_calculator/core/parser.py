@@ -203,11 +203,11 @@ def events_from_row(row) -> list:
     if time_range is not None:
         t_start, t_end = time_range
         minutes = date_utils.deduct_minutes(t_start, t_end)
-        events.append(build_event(raw_category, start_d, t_start, t_end, minutes))
+        events.append(build_event(raw_category, start_d, t_start, t_end, minutes, source_row=row))
     else:
         for d in date_utils.daterange(start_d, end_d):
             if d.weekday() < 5:
-                events.append(build_event(raw_category, d, source_range=(start_d, end_d)))
+                events.append(build_event(raw_category, d, source_range=(start_d, end_d), source_row=row))
     return events
 
 
