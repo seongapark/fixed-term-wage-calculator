@@ -1,7 +1,7 @@
 """3-A/3-B 입력 파일(A: 개인정보, B: 근무상황) 로더."""
 import openpyxl
 
-from . import date_utils
+from . import date_utils, mapping, pending
 from .models import Employee, TargetPerson, build_event
 from output.wage_sheet import COL, SHEET_NAME, DATA_START_ROW
 
@@ -208,7 +208,31 @@ def events_from_row(row) -> list:
         for d in date_utils.daterange(start_d, end_d):
             if d.weekday() < 5:
                 events.append(build_event(raw_category, d, source_range=(start_d, end_d), source_row=row))
+
+    _apply_saved_decision(row, events)
     return events
+
+
+def _apply_saved_decision(row, events) -> None:
+    """전월 결과파일에 저장된 판정을 이벤트에 되살린다.
+
+    양쪽 칸이 다 채워져 있을 때만 판정으로 인정한다 - 한 칸만 있으면 수기 편집
+    중일 수 있으므로 다시 묻는 편이 안전하다. 인식된 9종의 분류는 덮어쓰지
+    않는다(덮어쓰면 "연가"의 잔량 소진이 사라진다)."""
+    paid_text = str(row.get(pending.PAID_COL) or "").strip()
+    accrual_text = str(row.get(pending.ACCRUAL_COL) or "").strip()
+    if paid_text not in (pending.PAID_YES, pending.PAID_NO):
+        return
+    if accrual_text not in (pending.ACCRUAL_YES, pending.ACCRUAL_NO):
+        return
+    paid = paid_text == pending.PAID_YES
+    accrual = accrual_text == pending.ACCRUAL_YES
+    for e in events:
+        e.unpaid = not paid
+        e.breaks = not accrual
+        e.decided = True
+        if mapping.is_pending(e.classified):
+            e.classified = "유급특별휴가" if paid else "무급특별휴가"
 
 
 def load_previous_payroll(path) -> dict:
