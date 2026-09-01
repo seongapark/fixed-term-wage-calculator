@@ -22,6 +22,8 @@ from core.parser import (
     load_employees,
     load_giganje_rows,
     load_previous_payroll,
+    load_previous_status_rows,
+    merge_status_rows,
 )
 from core.payroll import calc_payroll
 from core.retroactive import compute_retroactive
@@ -58,7 +60,12 @@ class AppState:
     def load_files(self, a_path, b_path, prev_payroll_path=None):
         self._reset_data()
         self.employees = load_employees(a_path)
-        self.giganje_rows = load_giganje_rows(b_path)
+        current_rows = load_giganje_rows(b_path)
+        # 전월 결과파일은 두 가지를 나른다: 소급용 계약기간·실지급액(임금내역 시트)과
+        # 지난 달 근무상황+판정(근무상황 시트). 뒤엣것을 당월 B파일과 합쳐 하나로
+        # 만들어 두면, 계산 엔진·소급·산정근거 화면은 합본만 보면 된다.
+        previous_rows = load_previous_status_rows(prev_payroll_path) if prev_payroll_path else []
+        self.giganje_rows = merge_status_rows(current_rows, previous_rows)
         self.people, self.missing_names, self.ambiguous_names = build_target_people(
             self.giganje_rows, self.employees
         )
