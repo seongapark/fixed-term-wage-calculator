@@ -4,6 +4,7 @@ import openpyxl
 from . import date_utils, mapping, pending
 from .models import Employee, TargetPerson, build_event
 from output.wage_sheet import COL, SHEET_NAME, DATA_START_ROW
+from output.raw_sheet import COLUMNS as STATUS_COLUMNS, SHEET_NAME as STATUS_SHEET_NAME
 
 
 def _header_index(ws):
@@ -264,3 +265,86 @@ def load_previous_payroll(path) -> dict:
             "account": ws.cell(row=r, column=COL["account"]).value or "",
         }
     return result
+
+
+def load_previous_status_rows(path) -> list:
+    """전월 결과파일의 '근무상황(기간제)' 시트를 B파일과 같은 모양의 행으로 읽는다.
+
+    이 시트는 이 프로그램이 직접 만든 것이라 헤더가 1행에 그대로 있다. 그래도 열
+    위치를 고정하지 않고 헤더 텍스트로 찾는다 - 예전 버전이 만든 파일에는 판정
+    2열이 없기 때문이다(없으면 그 행은 판정 없이 들어와 확인 화면에서 다시 묻는다).
+
+    시트가 없으면 빈 리스트를 돌려준다. 옛 버전이 만든 파일이나 근무상황을 첨부하지
+    않고 만든 파일도 소급용(임금내역 시트)으로는 여전히 쓸 수 있어야 하므로, 여기서
+    예외를 던지지 않는다.
+    """
+    wb = openpyxl.load_workbook(path, data_only=True)
+    if STATUS_SHEET_NAME not in wb.sheetnames:
+        return []
+    ws = wb[STATUS_SHEET_NAME]
+
+    headers = {}
+    for c in range(1, ws.max_column + 1):
+        v = ws.cell(row=1, column=c).value
+        if v is not None:
+            headers[str(v).strip()] = c
+
+    rows = []
+    for r in range(2, ws.max_row + 1):
+        row = {name: None for name in STATUS_COLUMNS}
+        for name, col in headers.items():
+            row[name] = ws.cell(row=r, column=col).value
+        name = row.get("성명")
+        if name is None or str(name).strip() == "":
+            continue
+        row["성명"] = str(name).strip()
+        rows.append(row)
+    return rows
+
+
+def _status_row_key(row):
+    """중복 판정 키. 사유·비고는 넣지 않는다 - 나중에 채워질 수 있고, 값이
+    달라졌다고 다른 근무상황으로 볼 이유가 없다.
+
+    날짜·시간 셀은 openpyxl이 datetime으로 돌려줄 수도, 문자열로 돌려줄 수도 있어
+    파싱해 정규화한 뒤 비교한다(정규화 없이 str()로 비교하면 같은 행이 두 번 들어온다).
+    """
+    birth = row.get("생년월일")
+    try:
+        birth_key = date_utils.parse_date(birth).isoformat() if birth not in (None, "") else ""
+    except (ValueError, TypeError):
+        birth_key = str(birth or "").strip()
+
+    period = row.get("사용기간(날짜)")
+    try:
+        start_d, end_d = date_utils.parse_date_range(period)
+        period_key = f"{start_d.isoformat()}~{end_d.isoformat()}"
+    except (ValueError, TypeError):
+        period_key = str(period or "").strip()
+
+    try:
+        time_range = date_utils.parse_time_range(row.get("사용시간(시분)"))
+    except (ValueError, TypeError):
+        time_range = None
+    time_key = f"{time_range[0]}~{time_range[1]}" if time_range else ""
+
+    return (
+        str(row.get("성명") or "").strip(),
+        birth_key,
+        str(row.get("종별") or "").strip(),
+        period_key,
+        time_key,
+    )
+
+
+def merge_status_rows(current_rows, previous_rows) -> list:
+    """전월 결과파일에서 온 근무상황과 당월 B파일을 하나로 합친다.
+
+    같은 키의 행이 양쪽에 있으면 **당월 B파일이 이긴다** - e-사람에서 방금 조회한
+    쪽이 정본이고, 결재·사유가 나중에 채워졌을 수 있다. 순서는 지난 달 -> 당월로
+    두어 출력 시트와 산정근거 화면이 시간 순으로 읽히게 한다.
+    """
+    current_keys = {_status_row_key(r) for r in current_rows}
+    merged = [r for r in previous_rows if _status_row_key(r) not in current_keys]
+    merged.extend(current_rows)
+    return merged
