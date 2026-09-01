@@ -16,8 +16,13 @@ class UploadRequest(BaseModel):
     prev_path: Optional[str] = None
 
 
+class SpecialLeaveDecision(BaseModel):
+    paid: Optional[bool] = None
+    accrual: Optional[bool] = None
+
+
 class SpecialLeaveConfirmRequest(BaseModel):
-    statuses: List[str]
+    decisions: List[SpecialLeaveDecision]
 
 
 class BatchAssignRequest(BaseModel):
@@ -77,7 +82,7 @@ def create_app(state: Optional[AppState] = None) -> FastAPI:
     @app.post("/api/special-leave/confirm")
     def confirm_special_leave(req: SpecialLeaveConfirmRequest):
         try:
-            state.confirm_special_leave(req.statuses)
+            state.confirm_special_leave([d.model_dump() for d in req.decisions])
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         return {"ok": True}

@@ -76,7 +76,7 @@ def test_edit_contract_marks_overridden():
 
 def test_prepare_calculation_rejects_invalid_month():
     state = _loaded_state()
-    state.confirm_special_leave(["유급특별휴가"])
+    state.confirm_special_leave([{"paid": True, "accrual": True}] * len(state.pending_leave_groups))
     try:
         state.prepare_calculation(2026, 13)
         assert False, "ValueError를 기대했지만 발생하지 않음"
@@ -87,7 +87,7 @@ def test_prepare_calculation_rejects_invalid_month():
 
 def test_prepare_calculation_returns_unassigned_and_sets_work_period():
     state = _loaded_state()
-    state.confirm_special_leave(["유급특별휴가"])
+    state.confirm_special_leave([{"paid": True, "accrual": True}] * len(state.pending_leave_groups))
     unassigned = state.prepare_calculation(2026, 8)
     assert state.work_year == 2026
     assert state.work_month == 8

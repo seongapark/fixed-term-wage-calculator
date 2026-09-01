@@ -26,8 +26,9 @@ def test_load_files_populates_people_and_flags_pending_special_leave():
     assert len(state.people) == 5
     assert result["ambiguous_names"] == []
     assert result["has_pending_special_leave"] is True
-    assert len(state.pending_leave_groups) == 1
-    assert state.pending_leave_groups[0]["person_name"] == "최지은"
+    # 미인식 종별(특별휴가) 1건 + 사유가 적힌 인식 종별(연가) 1건이 확인 대상이다.
+    assert len(state.pending_leave_groups) == 2
+    assert {g["person_name"] for g in state.pending_leave_groups} == {"최지은", "김영희"}
     print("OK: test_load_files_populates_people_and_flags_pending_special_leave")
 
 
@@ -42,7 +43,7 @@ def test_reloading_files_clears_stale_calculation_results():
     state = AppState()
     state.config_obj = _config_with_survey()
     state.load_files(str(A_FILE), str(B_FILE))
-    state.confirm_special_leave(["유급특별휴가"])
+    state.confirm_special_leave([{"paid": True, "accrual": True}] * len(state.pending_leave_groups))
     keys = list(state.people.keys())
     state.batch_assign(keys, "8월 정기조사")
     state.prepare_calculation(2026, 8)

@@ -83,7 +83,7 @@ def _ready_state_with_previous_payroll():
         state = AppState()
         state.config_obj = _config_with_survey()
         state.load_files(str(A_FILE), str(B_FILE), prev_payroll_path=str(prev_payroll_file))
-        state.confirm_special_leave(["유급특별휴가"])
+        state.confirm_special_leave([{"paid": True, "accrual": True}] * len(state.pending_leave_groups))
         keys = list(state.people.keys())
         state.batch_assign(keys, "8월 정기조사")
         state.prepare_calculation(2026, 8)

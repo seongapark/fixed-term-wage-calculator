@@ -7,7 +7,7 @@
 from datetime import date
 from pathlib import Path
 
-from core import coverage, date_utils, mapping
+from core import coverage, date_utils, pending
 from core.paths import downloads_dir
 from output.build import (
     build_departed_workbook,
@@ -29,67 +29,6 @@ from core.retroactive import compute_retroactive
 from core import leave_engine
 from core.leave_engine import leave_usage_minutes
 from core.parser import person_key
-
-
-def collect_pending_groups(people):
-    """people(dict[key, TargetPerson]) 전체에서 classified가 확인 대기("특별휴가_미정")인
-    이벤트를 (person_key, source_range)로 묶어 그룹 목록을 만든다.
-
-    반환: [{"person_key", "person_name", "start", "end", "events", "status"}, ...]
-    status는 None(미정) / "유급특별휴가" / "무급특별휴가".
-    """
-    groups = {}
-    order = []
-    for key, person in people.items():
-        for e in person.events:
-            if not mapping.is_pending(e.classified):
-                continue
-            # 같은 사람·같은 기간이라도 종별이 다르면 별개 건으로 봐야 한다
-            # (원본 B파일에서 같은 날짜 범위로 서로 다른 종별이 두 줄 나올 수 있음).
-            gkey = (key, e.source_range, e.raw_category)
-            if gkey not in groups:
-                groups[gkey] = {
-                    "person_key": key,
-                    "person_name": person.name,
-                    "raw_category": e.raw_category,
-                    "classified": e.classified,
-                    "start": e.source_range[0],
-                    "end": e.source_range[1],
-                    "events": [],
-                    "status": None,
-                }
-                order.append(gkey)
-            groups[gkey]["events"].append(e)
-    return [groups[k] for k in order]
-
-
-def _find_reason_note(giganje_rows, person_name, start, end, raw_category=None):
-    """원본 B파일 행에서 이 그룹과 같은 성명·종별·기간의 사유/비고를 찾아 힌트로
-    보여준다(자동 판정에는 쓰지 않음 - 지역마다 기재 여부가 달라 참고용일 뿐).
-
-    종별은 "특별휴가" 고정이 아니다. 경조사·포상 등 유급/무급 미확정 휴가와
-    규칙에 걸리지 않은 처음 보는 종별도 이 화면에 오므로, 그룹의 원본 종별
-    문자열로 대조한다(raw_category 미지정이면 확인 대상 분류 전체를 허용).
-    """
-    for row in giganje_rows:
-        if str(row.get("성명") or "").strip() != person_name:
-            continue
-        row_category = str(row.get("종별") or "").strip()
-        if raw_category is not None:
-            if row_category != raw_category:
-                continue
-        elif not mapping.is_pending(mapping.classify(row_category)):
-            continue
-        date_field = row.get("사용기간(날짜)")
-        if date_field is None:
-            continue
-        try:
-            row_start, row_end = date_utils.parse_date_range(date_field)
-        except (ValueError, TypeError):
-            continue
-        if row_start == start and row_end == end:
-            return str(row.get("사유") or ""), str(row.get("비고") or "")
-    return "", ""
 
 
 class AppState:
@@ -124,7 +63,7 @@ class AppState:
             self.giganje_rows, self.employees
         )
         self.previous_payroll = load_previous_payroll(prev_payroll_path) if prev_payroll_path else {}
-        self.pending_leave_groups = collect_pending_groups(self.people)
+        self.pending_leave_groups = pending.collect_groups(self.people)
         return {
             "ambiguous_names": list(self.ambiguous_names),
             "has_pending_special_leave": bool(self.pending_leave_groups),
@@ -133,34 +72,24 @@ class AppState:
     def special_leave_groups(self):
         out = []
         for idx, g in enumerate(self.pending_leave_groups):
-            reason, note = _find_reason_note(
-                self.giganje_rows, g["person_name"], g["start"], g["end"], g["raw_category"],
-            )
             out.append({
                 "index": idx,
                 "person_name": g["person_name"],
                 "raw_category": g["raw_category"],
                 "start": g["start"].isoformat(),
                 "end": g["end"].isoformat(),
-                "reason": reason,
-                "note": note,
-                "status": g["status"],
+                "reason": g["reason"],
+                "note": g["note"],
+                "default_paid": g["default_paid"],
+                "default_accrual": g["default_accrual"],
+                "paid": g["paid"],
+                "accrual": g["accrual"],
             })
         return out
 
-    VALID_SPECIAL_LEAVE_STATUSES = {"유급특별휴가", "무급특별휴가"}
-
-    def confirm_special_leave(self, statuses):
-        if len(statuses) != len(self.pending_leave_groups):
-            raise ValueError("특별휴가 상태 값 개수가 대기 중인 건수와 맞지 않습니다.")
-        if any(not s for s in statuses):
-            raise ValueError("모든 건에 유급/무급을 지정해야 진행할 수 있습니다.")
-        if any(s not in self.VALID_SPECIAL_LEAVE_STATUSES for s in statuses):
-            raise ValueError("특별휴가 상태 값은 '유급특별휴가' 또는 '무급특별휴가'만 지정할 수 있습니다.")
-        for g, status in zip(self.pending_leave_groups, statuses):
-            g["status"] = status
-            for e in g["events"]:
-                e.classified = status
+    def confirm_special_leave(self, decisions):
+        """확인 화면의 판정을 적용한다. decisions: [{"paid": bool, "accrual": bool}, ...]"""
+        pending.apply_decisions(self.pending_leave_groups, decisions)
 
     def targets(self):
         all_names = [p.name for p in self.people.values()]
@@ -207,8 +136,8 @@ class AppState:
             )
         if not (1 <= month <= 12):
             raise ValueError("급여산정 연/월을 올바르게 입력하세요.")
-        if any(g["status"] is None for g in self.pending_leave_groups):
-            raise ValueError("유급/무급 확인이 끝나야 계산을 진행할 수 있습니다.")
+        if not pending.is_decided(self.pending_leave_groups):
+            raise ValueError("유급/무급과 주휴·연가 발생 여부 확인이 끝나야 계산을 진행할 수 있습니다.")
         # 연가·주휴는 계약 시작일부터 누적 판정하므로, 계약 시작월부터 계산월까지
         # 근무상황이 전부 있어야 한다. 빠진 달이 있으면 그 달이 '만근'으로 잘못
         # 처리되므로 계산 자체를 막는다.

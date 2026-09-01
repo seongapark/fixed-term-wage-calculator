@@ -27,7 +27,8 @@ def _ready_client(tmp_path, monkeypatch):
     client = TestClient(app)
 
     client.post("/api/upload", json={"a_path": str(A_FILE), "b_path": str(B_FILE)})
-    client.post("/api/special-leave/confirm", json={"statuses": ["유급특별휴가"]})
+    groups = client.get("/api/special-leave").json()["groups"]
+    client.post("/api/special-leave/confirm", json={"decisions": [{"paid": True, "accrual": True}] * len(groups)})
     keys = [t["key"] for t in client.get("/api/targets").json()["targets"]]
     client.post("/api/targets/batch-assign", json={"keys": keys, "survey_name": "8월 정기조사"})
     client.post("/api/targets/proceed", json={"year": 2026, "month": 8})

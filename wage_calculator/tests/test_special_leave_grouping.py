@@ -5,7 +5,7 @@ from datetime import date
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.models import TargetPerson, LeaveEvent
-from webapp.state import collect_pending_groups
+from core.pending import collect_groups as collect_pending_groups
 
 
 def test_same_source_range_merges_into_one_group():
@@ -23,7 +23,7 @@ def test_same_source_range_merges_into_one_group():
     assert len(groups) == 1, f"공가는 제외, 특별휴가 2건은 한 그룹: {groups}"
     assert len(groups[0]["events"]) == 2
     assert groups[0]["start"] == d1 and groups[0]["end"] == d2
-    assert groups[0]["status"] is None
+    assert groups[0]["paid"] is None and groups[0]["accrual"] is None
     print("OK: test_same_source_range_merges_into_one_group")
 
 

@@ -49,9 +49,10 @@ def test_special_leave_flow_then_targets_flow():
     groups_resp = client.get("/api/special-leave")
     assert groups_resp.status_code == 200
     groups = groups_resp.json()["groups"]
-    assert len(groups) == 1
+    # 미인식 종별(특별휴가) 1건 + 사유가 적힌 인식 종별(연가) 1건
+    assert len(groups) == 2
 
-    confirm_resp = client.post("/api/special-leave/confirm", json={"statuses": ["유급특별휴가"]})
+    confirm_resp = client.post("/api/special-leave/confirm", json={"decisions": [{"paid": True, "accrual": True}] * len(groups)})
     assert confirm_resp.status_code == 200, confirm_resp.text
 
     targets_resp = client.get("/api/targets")

@@ -25,7 +25,7 @@ def _state_with_survey(start, end):
     })
     state.load_files(str(A_FILE), str(B_FILE))
     if state.pending_leave_groups:
-        state.confirm_special_leave(["유급특별휴가"] * len(state.pending_leave_groups))
+        state.confirm_special_leave([{"paid": True, "accrual": True}] * len(state.pending_leave_groups))
     state.batch_assign(list(state.people.keys()), "정기조사")
     return state
 

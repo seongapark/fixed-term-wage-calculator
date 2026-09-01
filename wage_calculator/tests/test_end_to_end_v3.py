@@ -12,7 +12,7 @@ from core.parser import person_key
 from core.payroll import calc_payroll
 from core.models import build_event, TargetPerson
 from core import leave_engine
-from webapp.state import collect_pending_groups
+from core.pending import collect_groups as collect_pending_groups
 from output.wage_sheet import build_wage_sheet
 
 
