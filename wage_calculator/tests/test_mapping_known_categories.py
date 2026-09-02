@@ -17,8 +17,28 @@ def test_full_width_and_padding_are_normalized():
     assert mapping.classify("ᄀ") == mapping.UNDETERMINED_SPECIAL
 
 
+def test_half_day_leave_is_written_with_morning_or_afternoon():
+    """현장 표기는 "반일연가(오전)"·"반일연가(오후)"다. 둘 다 반일연가로 처리한다."""
+    assert mapping.classify("반일연가(오전)") == "반일연가"
+    assert mapping.classify("반일연가(오후)") == "반일연가"
+    assert mapping.classify("반일연가") == "반일연가"
+
+
+def test_inner_spaces_do_not_break_recognition():
+    """청·지청마다 공백이 들어가도 같은 종별로 본다(의미 있는 공백이 없다)."""
+    assert mapping.classify("반일연가 (오전)") == "반일연가"
+    assert mapping.classify("반일연가( 오후 )") == "반일연가"
+    assert mapping.classify("일반 병가") == "일반병가"
+
+
+def test_spaces_do_not_make_unknown_forms_match():
+    """공백만 지울 뿐 괄호는 남기므로, 안 쓰는 표기는 여전히 확인 화면으로 간다."""
+    assert mapping.classify("조퇴 (연가처리)") == mapping.UNDETERMINED_SPECIAL
+    assert mapping.classify("반일연가(종일)") == mapping.UNDETERMINED_SPECIAL
+
+
 def test_parenthesised_variants_go_to_pending():
-    for name in ("일반병가(진단서미첨부)", "조퇴(연가처리)", "반일연가(오전)",
+    for name in ("일반병가(진단서미첨부)", "조퇴(연가처리)",
                  "공무상병가", "관외여행", "경조사휴가", "자녀돌봄휴가", "대체휴무"):
         assert mapping.classify(name) == mapping.UNDETERMINED_SPECIAL
 
@@ -43,6 +63,8 @@ def test_property_tables():
 
 def test_half_day_annual_leave_weight():
     assert mapping.full_day_weight("반일연가") == 0.5
+    assert mapping.full_day_weight("반일연가(오전)") == 0.5
+    assert mapping.full_day_weight("반일연가(오후)") == 0.5
     assert mapping.full_day_weight("연가") == 1.0
     assert mapping.full_day_weight("기타") == 1.0
 
@@ -56,6 +78,9 @@ def test_is_pending():
 if __name__ == "__main__":
     test_nine_known_categories_classify_to_themselves()
     test_full_width_and_padding_are_normalized()
+    test_half_day_leave_is_written_with_morning_or_afternoon()
+    test_inner_spaces_do_not_break_recognition()
+    test_spaces_do_not_make_unknown_forms_match()
     test_parenthesised_variants_go_to_pending()
     test_empty_and_none_go_to_pending()
     test_classify_never_raises()
