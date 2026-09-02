@@ -22,6 +22,7 @@ from core.parser import (
     load_employees,
     load_giganje_rows,
     load_previous_payroll,
+    last_status_date,
     load_previous_status_rows,
     merge_status_rows,
 )
@@ -48,6 +49,7 @@ class AppState:
         self.work_month = None
         self.results = []
         self.previous_payroll = {}
+        self.prev_status_last_date = None
         self.retro_adjustments = {}
         self.retro_details = {}
         self.departed_results = []
@@ -66,6 +68,9 @@ class AppState:
         # 만들어 두면, 계산 엔진·소급·산정근거 화면은 합본만 보면 된다.
         previous_rows = load_previous_status_rows(prev_payroll_path) if prev_payroll_path else []
         self.giganje_rows = merge_status_rows(current_rows, previous_rows)
+        # 전월 파일이 어느 날짜까지의 근무상황을 담고 있는지. 선지급(20일경) 이후
+        # 발생한 전월분이 어디에도 없을 수 있어, 화면이 사람에게 확인받는다.
+        self.prev_status_last_date = last_status_date(previous_rows)
         self.people, self.missing_names, self.ambiguous_names = build_target_people(
             self.giganje_rows, self.employees
         )
@@ -74,6 +79,9 @@ class AppState:
         return {
             "ambiguous_names": list(self.ambiguous_names),
             "has_pending_special_leave": bool(self.pending_leave_groups),
+            "prev_status_last_date": (
+                self.prev_status_last_date.isoformat() if self.prev_status_last_date else None
+            ),
         }
 
     def special_leave_groups(self):

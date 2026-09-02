@@ -67,6 +67,27 @@ export function openContractPeriodCheckModal(onProceed) {
   overlay.querySelector("#check-yes").addEventListener("click", () => { overlay.remove(); onProceed(); });
 }
 
+export function openPrevStatusCheckModal(lastDateIso, onProceed, onReattach) {
+  const last = new Date(lastDateIso + "T00:00:00");
+  const next = new Date(last.getTime() + 24 * 60 * 60 * 1000);
+  const fmt = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+
+  const overlay = openModal(`
+    <h2 class="modal-title">전월 근무상황 확인</h2>
+    <p class="modal-body">전월 임금내역 파일에 담긴 마지막 근무상황은 <strong>${escapeHtml(fmt(last))}</strong>입니다.
+
+<strong>${escapeHtml(fmt(next))} 이후</strong> 전월분 근무상황이 더 발생하지 않은 것이 맞습니까?
+
+급여를 20일경 선지급한 뒤 생긴 결근·조퇴 등은 전월 파일에 들어 있지 않습니다. 그런 건이 있는데 근무상황(B)에도 없으면, 그 금액이 소급계산에 반영되지 않고 조용히 빠집니다.</p>
+    <div class="modal-actions">
+      <button class="btn" id="prev-status-reattach" type="button">아니오(다시 첨부)</button>
+      <button class="btn btn-primary" id="prev-status-ok" type="button">네(계속)</button>
+    </div>
+  `);
+  overlay.querySelector("#prev-status-reattach").addEventListener("click", () => { overlay.remove(); onReattach(); });
+  overlay.querySelector("#prev-status-ok").addEventListener("click", () => { overlay.remove(); onProceed(); });
+}
+
 export async function openConfirmRunModal(onRun) {
   let info;
   try {

@@ -348,3 +348,29 @@ def merge_status_rows(current_rows, previous_rows) -> list:
     merged = [r for r in previous_rows if _status_row_key(r) not in current_keys]
     merged.extend(current_rows)
     return merged
+
+
+def last_status_date(rows):
+    """행 목록에서 가장 늦은 근무상황 날짜(사용기간 종료일)를 돌려준다. 없으면 None.
+
+    전월 결과파일이 "어느 날짜까지의 근무상황을 담고 있는지"를 알려주는 용도다.
+    급여는 20일경 선지급하므로 전월 파일에는 그 시점까지의 근무상황만 들어 있고,
+    이후 발생한 결근·조퇴는 어디에도 없다 - 그 사실을 사람에게 확인받기 위해
+    이 날짜를 화면에 보여준다.
+
+    조회 범위의 끝이 아니라 **실제로 기록이 있는 마지막 날**이다(B파일에 조회기간
+    정보가 없어 범위는 알 수 없다). 그래서 화면 문구도 "이 날짜 이후로 근무상황이
+    더 있느냐"고 묻는 형태여야 한다.
+    """
+    latest = None
+    for row in rows:
+        date_field = row.get("사용기간(날짜)")
+        if date_field is None or str(date_field).strip() == "":
+            continue
+        try:
+            _start_d, end_d = date_utils.parse_date_range(date_field)
+        except (ValueError, TypeError):
+            continue
+        if latest is None or end_d > latest:
+            latest = end_d
+    return latest

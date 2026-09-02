@@ -1,6 +1,7 @@
 import { api } from "./api.js";
 import { navigate } from "./router.js";
 import { showError, showWarning } from "./toast.js";
+import { openPrevStatusCheckModal } from "./confirmModals.js";
 
 export function render(container) {
   container.innerHTML = `
@@ -23,9 +24,8 @@ export function render(container) {
         <button class="btn" id="prev-browse" type="button">찾아보기</button>
       </div>
       <div class="text-muted" style="margin: 0 0 var(--space-4) 176px;">
-        <p style="margin: 0 0 var(--space-1);">※ 3번째 첨부파일(전월 임금내역)을 비워두면 소급계산을 하지 않습니다.</p>
-        <p style="margin: 0 0 var(--space-1);">※ 3번째 첨부파일에는 본 프로그램으로 추출한 전월 임금결과 파일을 넣으시면 됩니다.</p>
-        <p style="margin: 0;">※ 근무상황 파일(B)은 <strong>계약 전체 기간</strong>(계약 시작월~당월)을 추출해 첨부하세요. 연가 잔량이 계약 전체의 만근·사용 이력에 의존하므로, 일부 기간만 넣으면 연가·소급 계산이 부정확해질 수 있습니다.</p>
+        <p style="margin: 0 0 var(--space-1);">※ 두번째 첨부파일: 전월 반영하지 못한 근무상황이 있는 경우 꼭 함께 포함해서 넣으세요.</p>
+        <p style="margin: 0;">※ 세번째 첨부파일: 계약 첫달에는 비워두시면 됩니다. 비워두면 소급계산을 하지 않습니다.</p>
       </div>
       <div class="actions">
         <button class="btn btn-primary" id="next-btn" type="button">다음</button>
@@ -61,10 +61,13 @@ export function render(container) {
         );
         return;
       }
-      if (result.has_pending_special_leave) {
-        navigate("specialLeave");
+      const goNext = () => navigate(result.has_pending_special_leave ? "specialLeave" : "targets");
+      if (result.prev_status_last_date) {
+        openPrevStatusCheckModal(result.prev_status_last_date, goNext, () => {
+          showWarning("근무상황(B)을 전월 1일부터 이번 달까지 다시 뽑아, 누락된 전월분을 포함해 첨부한 뒤 진행하세요.");
+        });
       } else {
-        navigate("targets");
+        goNext();
       }
     } catch (e) {
       showError(e.message);
