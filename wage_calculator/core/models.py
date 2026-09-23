@@ -52,6 +52,7 @@ class TargetPerson:
     contract_start: Optional[date] = None
     contract_end: Optional[date] = None
     contract_overridden: bool = False
+    contract_restored: bool = False  # contracts.json에서 전월값을 불러왔는가(화면 표시용)
     events: list = field(default_factory=list)  # list[LeaveEvent]
 
 

@@ -7,7 +7,7 @@
 from datetime import date
 from pathlib import Path
 
-from core import coverage, date_utils, pending
+from core import contracts, coverage, date_utils, pending
 from core.paths import downloads_dir
 from output.build import (
     build_departed_workbook,
@@ -74,6 +74,8 @@ class AppState:
         self.people, self.missing_names, self.ambiguous_names = build_target_people(
             self.giganje_rows, self.employees
         )
+        # 지난달 계산 때 지정한 담당조사·계약기간을 같은 사람에게 다시 채운다.
+        contracts.restore(self.people, self.config_obj)
         self.previous_payroll = load_previous_payroll(prev_payroll_path) if prev_payroll_path else {}
         self.pending_leave_groups = pending.collect_groups(self.people)
         return {
@@ -116,6 +118,7 @@ class AppState:
                 "survey_name": person.survey_name or "",
                 "contract_start": person.contract_start.isoformat() if person.contract_start else "",
                 "contract_end": person.contract_end.isoformat() if person.contract_end else "",
+                "restored": person.contract_restored,
             })
         return out
 
@@ -134,12 +137,14 @@ class AppState:
             person.contract_start = start
             person.contract_end = end
             person.contract_overridden = False
+            person.contract_restored = False
 
     def edit_contract(self, key, start, end):
         person = self.people[key]
         person.contract_start = date_utils.parse_date(start)
         person.contract_end = date_utils.parse_date(end)
         person.contract_overridden = True
+        person.contract_restored = False
 
     def prepare_calculation(self, year, month):
         """대상자 확인 화면의 '계산 실행' 검증. 통과하면 work_year/work_month를
@@ -188,6 +193,10 @@ class AppState:
             except Exception as e:
                 errors.append(f"{person.name}: {e}")
         self.results = results
+        try:
+            contracts.remember(targets)
+        except OSError as e:
+            errors.append(f"계약기간 저장 실패(다음 달에 다시 지정해야 합니다): {e}")
 
         self.retro_adjustments = {}
         self.retro_details = {}

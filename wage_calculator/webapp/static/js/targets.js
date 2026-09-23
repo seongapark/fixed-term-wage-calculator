@@ -51,7 +51,7 @@ export async function render(container) {
       <tr data-key="${escapeHtml(t.key)}">
         <td><input type="checkbox" data-check="${escapeHtml(t.key)}" ${checked.has(t.key) ? "checked" : ""}></td>
         <td>${escapeHtml(t.label)}</td>
-        <td>${escapeHtml(t.survey_name)}</td>
+        <td>${escapeHtml(t.survey_name)}${t.restored ? ' <span class="text-muted">(전월값)</span>' : ""}</td>
         <td>${escapeHtml(t.contract_start)}</td>
         <td>${escapeHtml(t.contract_end)}</td>
       </tr>
