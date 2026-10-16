@@ -1,10 +1,38 @@
 """3-A/3-B 입력 파일(A: 개인정보, B: 근무상황) 로더."""
+import io
+import re
+import zipfile
+
 import openpyxl
 
 from . import date_utils, mapping, pending
 from .models import Employee, TargetPerson, build_event
 from output.wage_sheet import COL, SHEET_NAME, DATA_START_ROW
 from output.raw_sheet import COLUMNS as STATUS_COLUMNS, SHEET_NAME as STATUS_SHEET_NAME
+
+
+# 한셀이 저장한 xlsx는 셀 서식 일부를 mc:AlternateContent로 감싸는데, openpyxl은 이를
+# 건너뛰어 서식 목록이 짧아지고 셀이 없는 서식 번호를 가리켜 IndexError가 난다.
+# 엑셀처럼 Fallback 쪽 서식만 남기면 순서가 유지된다.
+_ALT_CONTENT = re.compile(
+    rb"<mc:AlternateContent\b[^>]*>.*?<mc:Fallback>(.*?)</mc:Fallback></mc:AlternateContent>",
+    re.S,
+)
+
+
+def _open_workbook(path):
+    try:
+        return openpyxl.load_workbook(path, data_only=True)
+    except IndexError:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(path) as src, zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as dst:
+            for item in src.infolist():
+                data = src.read(item.filename)
+                if item.filename == "xl/styles.xml":
+                    data = _ALT_CONTENT.sub(rb"\1", data)
+                dst.writestr(item, data)
+        buf.seek(0)
+        return openpyxl.load_workbook(buf, data_only=True)
 
 
 def _header_index(ws):
@@ -25,7 +53,7 @@ def load_employees(path) -> dict:
 
     '생년월일' 컬럼은 필수는 아니지만, 있으면 동명이인을 구분하는 데 사용된다.
     """
-    wb = openpyxl.load_workbook(path, data_only=True)
+    wb = _open_workbook(path)
     ws = wb.worksheets[0]
     headers = _header_index(ws)
     required = ["성명", "주민번호", "은행", "계좌번호"]
@@ -71,7 +99,7 @@ def load_giganje_rows(path) -> list:
     추려서 관리되므로, build_target_people()에서 이름+생년월일로 A파일과
     매칭되는 행만 자연스럽게 급여 계산에 반영된다.
     """
-    wb = openpyxl.load_workbook(path, data_only=True)
+    wb = _open_workbook(path)
     ws = wb.worksheets[0]
     headers = _header_index(ws)
     required = ["소속", "직급", "성명", "생년월일", "종별", "사용기간(날짜)", "사용시간(시분)"]
@@ -241,7 +269,7 @@ def load_previous_payroll(path) -> dict:
     필요한 전월 정보를 주민번호를 키로 돌려준다. 이 파일은 프로그램이 직접
     만든 것이라 헤더 텍스트가 아니라 output/wage_sheet.py의 COL과 동일한
     고정 열 위치로 읽는다(헤더가 병합 셀이라 텍스트 파싱이 불안정함)."""
-    wb = openpyxl.load_workbook(path, data_only=True)
+    wb = _open_workbook(path)
     if SHEET_NAME not in wb.sheetnames:
         raise ValueError(f"전월 임금내역 파일에 '{SHEET_NAME}' 시트가 없습니다.")
     ws = wb[SHEET_NAME]
@@ -278,7 +306,7 @@ def load_previous_status_rows(path) -> list:
     않고 만든 파일도 소급용(임금내역 시트)으로는 여전히 쓸 수 있어야 하므로, 여기서
     예외를 던지지 않는다.
     """
-    wb = openpyxl.load_workbook(path, data_only=True)
+    wb = _open_workbook(path)
     if STATUS_SHEET_NAME not in wb.sheetnames:
         return []
     ws = wb[STATUS_SHEET_NAME]
