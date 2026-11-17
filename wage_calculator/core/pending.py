@@ -26,11 +26,15 @@ def _has_text(value) -> bool:
     return value is not None and str(value).strip() != ""
 
 
+def _paid_asked(event) -> bool:
+    return mapping.normalize(event.raw_category) in mapping.PAID_ASKED
+
+
 def needs_confirmation(event) -> bool:
     """이 이벤트를 확인 화면에 올려야 하는가."""
     if event.decided:
         return False
-    if mapping.is_pending(event.classified):
+    if mapping.is_pending(event.classified) or _paid_asked(event):
         return True
     row = event.source_row or {}
     return _has_text(row.get("사유")) or _has_text(row.get("비고"))
@@ -64,7 +68,7 @@ def collect_groups(people) -> list:
                     "events": [],
                     "row": e.source_row,
                     # 인식된 종별만 규칙이 답을 갖고 있다. 미인식 종별은 기본값 없이 올린다.
-                    "default_paid": (not e.unpaid) if known else None,
+                    "default_paid": (not e.unpaid) if known and not _paid_asked(e) else None,
                     "default_accrual": (not e.breaks) if known else None,
                     "paid": None,
                     "accrual": None,

@@ -325,7 +325,7 @@ class AppState:
                 "lunch_included": "포함" if (e.time_start < date_utils.LUNCH_START and e.time_end > date_utils.LUNCH_END) else "미포함",
                 "minutes": e.minutes,
                 "offset_minutes": covered,
-                "deducted_minutes": e.minutes - covered,
+                "deducted_minutes": (e.minutes - covered) if e.unpaid else 0,
             })
 
         total_days = (result.period_end - result.period_start).days + 1

@@ -108,6 +108,28 @@ def test_paid_special_leave_time_is_not_deducted():
     print("OK: test_paid_special_leave_time_is_not_deducted")
 
 
+def test_known_late_marked_paid_neither_offsets_nor_deducts():
+    """인식 종별 '지각'을 확인 화면에서 유급으로 고르면 연가도 급여도 깎지 않는다.
+
+    2026-11 실사례(지각 4건 454분 유급 + 기타 7분): 유급 지각이 연가를 454분
+    소진했고, 급여공제는 7 - 454 = -447분이 되어 공제액이 음수(과지급)로 나왔다.
+    """
+    late = build_event("지각", USED_ON, time(9, 0), time(11, 0), 120)
+    late.unpaid = False                         # 확인 화면에서 유급 선택
+    gita = build_event("기타", date(2026, 8, 10), time(9, 0), time(9, 7), 7)
+    person = TargetPerson(
+        name="홍길동", survey_name="조사", events=[late, gita],
+        contract_start=CONTRACT_START, contract_end=CONTRACT_END,
+    )
+    r = calc_payroll(person, _config(), 2026, 8)
+    assert r.leave_offset_minutes == 0
+    assert r.late_out_minutes == 7
+    assert r.late_out_deduction > 0
+    assert r.remaining_leave_days == 1.0
+    assert r.leave_shortfall is False
+    print("OK: test_known_late_marked_paid_neither_offsets_nor_deducts")
+
+
 def test_marked_reasons_are_never_worse_than_bare_early_leave():
     """사유를 정확히 적었다고 해서 손해 보는 일이 없어야 한다."""
     bare = _result("조퇴").total_payment

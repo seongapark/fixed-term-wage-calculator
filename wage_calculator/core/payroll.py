@@ -3,7 +3,7 @@ import math
 from dataclasses import dataclass, field
 from datetime import date
 
-from . import date_utils, leave_engine, mapping
+from . import date_utils, leave_engine
 
 
 def round_down(x, unit=1):
@@ -106,11 +106,11 @@ def calc_payroll(person, config, year: int, month: int) -> PayrollResult:
     # 조퇴/외출/지각은 보유 연가로 상계된 만큼만 급여에서 빠진다. 기타는 상계하지 않는다.
     offset_covered = sum(
         offset_map.get(id(e), 0)
-        for e in late_out_events if e.classified in mapping.OFFSETTABLE
+        for e in late_out_events if leave_engine.is_offset_target(e)
     )
     late_out_minutes = sum(e.minutes for e in late_out_events if e.unpaid) - offset_covered
     offsettable_used = sum(
-        e.minutes for e in late_out_events if e.classified in mapping.OFFSETTABLE
+        e.minutes for e in late_out_events if leave_engine.is_offset_target(e)
     )
     leave_offset_minutes = offset_covered
     leave_shortfall_minutes = offsettable_used - offset_covered

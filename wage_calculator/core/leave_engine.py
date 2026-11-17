@@ -128,7 +128,17 @@ def _consumes_leave_candidate(event) -> bool:
     """
     if event.classified in ("연가", "반일연가"):
         return True
-    return event.is_time_based and event.classified in mapping.OFFSETTABLE
+    return is_offset_target(event)
+
+
+def is_offset_target(event) -> bool:
+    """보유 연가로 상계하는 시간 기재 조퇴/외출/지각인가.
+
+    확인 화면에서 유급으로 고른 건(unpaid=False)은 뺀다. 깎을 급여가 없는데
+    연가로 상계하면 연가만 조용히 줄고, 급여공제 합계는 음수가 된다
+    (2026-11 실사례: 유급 지각 454분 + 기타 7분 -> 공제 -447분, 과지급).
+    """
+    return event.is_time_based and event.classified in mapping.OFFSETTABLE and event.unpaid
 
 
 def leave_usage_minutes(event, offset_map=None) -> int:
@@ -244,7 +254,7 @@ def simulate_leave_consumption(windows, events) -> LeaveConsumption:
     for e in events:
         if e.classified in ("연가", "반일연가"):
             entries.append((e.d, 1, leave_usage_minutes(e), e))
-        elif e.is_time_based and e.classified in mapping.OFFSETTABLE:
+        elif is_offset_target(e):
             entries.append((e.d, 2, e.minutes, e))
     entries.sort(key=lambda x: (x[0], x[1]))
 

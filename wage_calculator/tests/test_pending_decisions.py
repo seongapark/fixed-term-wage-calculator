@@ -118,3 +118,22 @@ if __name__ == "__main__":
         if _name.startswith("test_"):
             _fn()
     print("ALL OK")
+
+
+def test_sick_leave_without_certificate_is_sick_leave_but_paid_is_asked():
+    """일반병가(진단서미첨부)는 일반병가로 인식하되, 유급/무급은 기본값 없이 매번 묻는다.
+
+    진단서 없는 병가는 유급일 수도 무급일 수도 있어 규칙이 정하지 않는다.
+    사유·비고가 비어 있어도 확인 화면에 올라와야 한다.
+    """
+    people = {"홍길동::1990-01-01": _person("홍길동", [_row("일반병가(진단서미첨부)", "2026-08-10")])}
+    groups = pending.collect_groups(people)
+    assert len(groups) == 1
+    assert groups[0]["classified"] == "일반병가"
+    assert groups[0]["default_paid"] is None
+    assert groups[0]["default_accrual"] is False      # 종일 일반병가는 만근이 깨진다(규칙 값)
+
+    pending.apply_decisions(groups, [{"paid": False, "accrual": False}])
+    e = groups[0]["events"][0]
+    assert e.classified == "일반병가"                  # 인식 종별은 덮어쓰지 않는다
+    assert e.unpaid is True

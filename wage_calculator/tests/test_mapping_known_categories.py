@@ -38,9 +38,15 @@ def test_spaces_do_not_make_unknown_forms_match():
 
 
 def test_parenthesised_variants_go_to_pending():
-    for name in ("일반병가(진단서미첨부)", "조퇴(연가처리)",
+    for name in ("조퇴(연가처리)",
                  "공무상병가", "관외여행", "경조사휴가", "자녀돌봄휴가", "대체휴무"):
         assert mapping.classify(name) == mapping.UNDETERMINED_SPECIAL
+
+
+def test_sick_leave_without_certificate_is_explicit_alias():
+    """ALIASES에 명시한 표기만 인식한다(유급/무급은 확인 화면에서 묻는다, PAID_ASKED)."""
+    assert mapping.classify("일반병가(진단서미첨부)") == "일반병가"
+    assert mapping.classify("일반병가 (진단서미첨부)") == "일반병가"
 
 
 def test_empty_and_none_go_to_pending():
